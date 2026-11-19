@@ -183,7 +183,10 @@ export default {
     const url=new URL(request.url);
     if(url.pathname.startsWith("/api/")) {
       try { return await api(request,env); }
-      catch(e) { return json({error:"Внутренняя ошибка сервера",detail:env.ENVIRONMENT==="development"?String(e):undefined},500); }
+      catch(e) {
+  console.error("API error:", String(e));
+  return json({error:"Внутренняя ошибка сервера"},500);
+}
     }
     return env.ASSETS.fetch(request);
   }
