@@ -311,6 +311,88 @@ async function api(request, env) {
     });
   }
 
+  // Видеоотчёт: список и загрузка
+  const videoListMatch = path.match(/^\/api\/tasks\/(\d+)\/videos$/);
+  if (videoListMatch) {
+    const id = Number(videoListMatch[1]);
+    const access = await getTask(id, user, env);
+    if (access.error) return access.error;
+
+    if (method === "GET") {
+      const rows = await env.DB.prepare(`
+        SELECT v.id,v.uploaded_by,v.content_type,v.original_name,
+          v.size_bytes,v.created_at,u.full_name
+        FROM task_videos v JOIN users u ON u.id=v.uploaded_by
+        WHERE v.task_id=? ORDER BY v.created_at,v.id
+      `).bind(id).all();
+      return json({ videos: rows.results });
+    }
+
+    if (method === "POST") {
+      const task = access.task;
+      const allowedUploader = user.role === "admin" ||
+        task.assigned_to === user.id || task.created_by === user.id;
+      if (!allowedUploader) return json({ error: "Нет прав для загрузки видео" }, 403);
+
+      const form = await request.formData();
+      const file = form.get("file");
+
+      if (!(file instanceof File) || !file.size) {
+        return json({ error: "Выберите видеофайл" }, 400);
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        return json({ error: "Размер видео не должен превышать 50 МБ" }, 400);
+      }
+      if (!file.type.startsWith("video/")) {
+        return json({ error: "Можно загружать только видеофайлы" }, 400);
+      }
+      if (!env.FILES) return json({ error: "Хранилище файлов не подключено" }, 500);
+
+      const safeName = String(file.name || "video")
+        .replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+      const key = `tasks/${id}/videos/${crypto.randomUUID()}-${safeName}`;
+
+      await env.FILES.put(key, file.stream(), {
+        httpMetadata: { contentType: file.type }
+      });
+
+      const r = await env.DB.prepare(`
+        INSERT INTO task_videos
+        (task_id,uploaded_by,file_key,content_type,original_name,size_bytes)
+        VALUES(?,?,?,?,?,?)
+      `).bind(id, user.id, key, file.type, file.name || "Видеоотчёт", file.size).run();
+
+      return json({ ok: true, id: r.meta.last_row_id });
+    }
+  }
+
+  // Просмотр видеоотчёта
+  const videoFileMatch = path.match(/^\/api\/tasks\/(\d+)\/videos\/(\d+)\/file$/);
+  if (videoFileMatch && method === "GET") {
+    const taskId = Number(videoFileMatch[1]);
+    const videoId = Number(videoFileMatch[2]);
+    const access = await getTask(taskId, user, env);
+    if (access.error) return access.error;
+
+    const video = await env.DB.prepare(
+      "SELECT * FROM task_videos WHERE id=? AND task_id=?"
+    ).bind(videoId, taskId).first();
+
+    if (!video) return json({ error: "Видеоотчёт не найден" }, 404);
+
+    const object = await env.FILES.get(video.file_key);
+    if (!object) return json({ error: "Видео отсутствует в хранилище" }, 404);
+
+    return new Response(object.body, {
+      headers: {
+        "content-type": video.content_type,
+        "content-length": String(video.size_bytes),
+        "cache-control": "private, no-store",
+        "content-disposition": "inline"
+      }
+    });
+  }
+
   // История задания
   const historyMatch = path.match(/^\/api\/tasks\/(\d+)\/history$/);
   if (historyMatch && method === "GET") {
