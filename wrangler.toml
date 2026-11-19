@@ -17,9 +17,3 @@ binding = "FILES"
 bucket_name = "baza-ot-tb-files"
 
 [vars]
-APP_NAME = "База — ЖК Олокон"
-# ...
-[vars]
-SESSION_SECRET = "055934343405593334340559333334001"
-SETUP_SECRET = "0550011611.0550011611.0559343433"
-# ...
