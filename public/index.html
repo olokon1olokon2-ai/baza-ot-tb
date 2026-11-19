@@ -24,6 +24,7 @@ button.secondary{background:#e8efeb;color:#173b32}button.danger{background:#a33b
 .counter b{font-size:23px;display:block}.counter.active{outline:2px solid #1d604d}
 .overdue{border:2px solid #c43c36;background:#fff8f7}.overdueText{color:#b32620;font-weight:bold}
 .photo{width:100%;max-width:180px;height:130px;object-fit:cover;border-radius:8px;border:1px solid #ddd;margin:5px}
+.videoPlayer{width:100%;max-width:520px;border-radius:8px;background:#111;margin:8px 0}
 .actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{width:auto;flex:1;min-width:130px}
 .history{border-left:3px solid #b9cec2;padding:5px 10px;margin:8px 0;font-size:13px}
 h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
@@ -207,15 +208,28 @@ function renderTaskList(){
    ${t.submitted_at?`<p class="muted">Отправлено на проверку: ${esc(fmtDate(t.submitted_at))}</p>`:''}
    ${t.review_comment?`<p><b>Комментарий проверяющего:</b> ${esc(t.review_comment)}</p>`:''}
    ${t.reviewer_name?`<p class="muted">Проверил: ${esc(t.reviewer_name)} · ${esc(fmtDate(t.reviewed_at))}</p>`:''}
+
    <div class="item">
     <b>Фотографии до и после</b>
     <div id="photos${t.id}" class="muted">Загрузка фотографий…</div>
     ${worker&&t.status!=='Выполнено'?`
-     <label>Фото до устранения</label><input type="file" accept="image/*" id="before${t.id}">
+     <label>Фото до устранения</label>
+     <input type="file" accept="image/*" id="before${t.id}">
      <button class="secondary" onclick="uploadPhoto(${t.id},'before')">Загрузить фото до</button>
-     <label>Фото после устранения</label><input type="file" accept="image/*" id="after${t.id}">
+     <label>Фото после устранения</label>
+     <input type="file" accept="image/*" id="after${t.id}">
      <button class="secondary" onclick="uploadPhoto(${t.id},'after')">Загрузить фото после</button>`:''}
    </div>
+
+   <div class="item">
+    <b>Видеоотчёт</b>
+    <div id="videos${t.id}" class="muted">Загрузка видео…</div>
+    ${worker&&t.status!=='Выполнено'?`
+     <label>Добавить видео (до 50 МБ)</label>
+     <input type="file" accept="video/*" id="video${t.id}">
+     <button class="secondary" onclick="uploadVideo(${t.id})">Загрузить видеоотчёт</button>`:''}
+   </div>
+
    ${worker&&t.status==='Новая'?`<button onclick="taskAction(${t.id},'start')">Начать работу</button>`:''}
    ${worker&&t.status==='В работе'?`
     <textarea id="report${t.id}" placeholder="Опишите выполненную работу"></textarea>
@@ -229,22 +243,26 @@ function renderTaskList(){
    <details><summary>История задания</summary><div id="history${t.id}">Загрузка истории…</div></details>
   </article>`;
  }).join('')||'<p class="muted">Заданий в этой категории нет.</p>';
- list.forEach(t=>{loadPhotos(t.id);loadHistory(t.id)});
+ list.forEach(t=>{loadPhotos(t.id);loadVideos(t.id);loadHistory(t.id)});
 }
+
 async function loadTasks(){
  try{const d=await api('/tasks');allTasks=d.tasks||[];renderTaskList()}
  catch(e){$('#taskList').textContent=e.message}
 }
+
 async function taskAction(id,action){
  try{await api('/tasks/'+id,{method:'PATCH',body:JSON.stringify({action})});await loadTasks()}
  catch(e){alert(e.message)}
 }
+
 async function submitReport(id){
  const comment=$('#report'+id).value.trim();
  if(!comment){alert('Напишите отчёт о выполненной работе');return}
  try{await api('/tasks/'+id,{method:'PATCH',body:JSON.stringify({action:'submit',comment})});await loadTasks()}
  catch(e){alert(e.message)}
 }
+
 async function reviewTask(id,action){
  const comment=$('#review'+id)?.value.trim()||'';
  if(action==='return'&&!comment){alert('Укажите причину возврата на доработку');return}
@@ -252,6 +270,7 @@ async function reviewTask(id,action){
  try{await api('/tasks/'+id,{method:'PATCH',body:JSON.stringify({action,comment})});await loadTasks()}
  catch(e){alert(e.message)}
 }
+
 async function uploadPhoto(id,type){
  const input=$('#'+type+id),file=input.files[0];
  if(!file){alert('Сначала выберите фотографию');return}
@@ -259,6 +278,34 @@ async function uploadPhoto(id,type){
  try{await api('/tasks/'+id+'/photos',{method:'POST',body:f});input.value='';await loadPhotos(id);alert('Фотография загружена')}
  catch(e){alert(e.message)}
 }
+
+// Загрузка видеоотчёта
+async function uploadVideo(id){
+ const input=$('#video'+id),file=input.files[0];
+ if(!file){alert('Сначала выберите видео');return}
+ if(file.size>50*1024*1024){alert('Размер видео не должен превышать 50 МБ');return}
+ if(!file.type.startsWith('video/')){alert('Выберите видеофайл');return}
+ const f=new FormData();f.append('file',file);
+ try{
+  await api('/tasks/'+id+'/videos',{method:'POST',body:f});
+  input.value='';
+  await loadVideos(id);
+  alert('Видеоотчёт загружен');
+ }catch(e){alert(e.message)}
+}
+
+// Просмотр видеоотчётов
+async function loadVideos(id){
+ const el=$('#videos'+id);if(!el)return;
+ try{
+  const d=await api('/tasks/'+id+'/videos');
+  el.innerHTML=d.videos.map(v=>`<div class="item">
+   <p class="muted">${esc(v.original_name)} · ${esc(v.full_name)} · ${esc(fmtDate(v.created_at))} · ${(v.size_bytes/1024/1024).toFixed(1)} МБ</p>
+   <video class="videoPlayer" controls playsinline preload="metadata" src="/api/tasks/${id}/videos/${v.id}/file"></video>
+  </div>`).join('')||'Видеоотчётов пока нет';
+ }catch(e){el.textContent=e.message}
+}
+
 async function loadPhotos(id){
  const el=$('#photos'+id);if(!el)return;
  try{
@@ -266,6 +313,7 @@ async function loadPhotos(id){
   el.innerHTML=d.photos.map(p=>`<div><span class="muted">${p.photo_type==='before'?'До устранения':'После устранения'} · ${esc(p.full_name)} · ${esc(fmtDate(p.created_at))}</span><br><a href="/api/tasks/${id}/photos/${p.id}/file" target="_blank"><img class="photo" src="/api/tasks/${id}/photos/${p.id}/file" alt="Фото задания"></a></div>`).join('')||'Фотографий пока нет';
  }catch(e){el.textContent=e.message}
 }
+
 async function loadHistory(id){
  const el=$('#history'+id);if(!el)return;
  try{
@@ -283,6 +331,7 @@ async function loadChecklist(){
   d.items.forEach(i=>$('#c'+i.id).value=i.result||'');
  }catch(e){$('#checkList').textContent=e.message}
 }
+
 async function saveCheck(id){
  try{await api('/checklist/entries',{method:'POST',body:JSON.stringify({itemId:id,date:$('#checkDate').value,result:$('#c'+id).value,comment:$('#m'+id).value})});alert('Сохранено')}
  catch(e){alert(e.message)}
@@ -294,6 +343,7 @@ $('#docForm').onsubmit=async e=>{
  e.preventDefault();try{await api('/documents',{method:'POST',body:new FormData(e.target)});e.target.reset();loadDocs()}
  catch(x){alert(x.message)}
 };
+
 async function loadDocs(){
  try{const d=await api('/documents');$('#docList').innerHTML=d.documents.map(x=>`<div class="item"><a href="/api/documents/${x.id}">${esc(x.title)}</a><small> · ${esc(x.uploaded_at)}</small></div>`).join('')||'<p class="muted">Документов пока нет.</p>'}
  catch(e){$('#docList').textContent=e.message}
@@ -304,14 +354,17 @@ $('#orgForm').onsubmit=async e=>{
  e.preventDefault();try{await api('/organizations',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});e.target.reset();loadAdmin()}
  catch(x){alert(x.message)}
 };
+
 $('#userForm').onsubmit=async e=>{
  e.preventDefault();try{await api('/users',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});e.target.reset();loadAdmin()}
  catch(x){alert(x.message)}
 };
+
 $('#checkItemForm').onsubmit=async e=>{
  e.preventDefault();try{await api('/checklist/items',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});e.target.reset();loadChecklist()}
  catch(x){alert(x.message)}
 };
+
 async function loadAdmin(){
  if(me.role!=='admin')return;
  try{
@@ -321,7 +374,9 @@ async function loadAdmin(){
   $('#userList').innerHTML=u.users.map(x=>`<div class="item">${esc(x.full_name)} · ${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</div>`).join('');
  }catch(e){console.error(e)}
 }
+
 async function loadAll(){await Promise.all([loadTasks(),loadChecklist(),loadDocs(),loadAdmin()])}
+
 async function init(){
  try{const d=await api('/me');me=d.user;showApp()}
  catch{showLogin()}
