@@ -1,26 +1,42 @@
+
 const enc = new TextEncoder();
+
 const json = (data, status=200, headers={}) => new Response(JSON.stringify(data), {
   status, headers: { "content-type":"application/json; charset=utf-8", ...headers }
 });
+
 const htmlEscape = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
 const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const unb64 = s => Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")), c=>c.charCodeAt(0));
-async function digest(s) { return b64(await crypto.subtle.digest("SHA-256", enc.encode(s))); }
+
+async function digest(s) {
+  return b64(await crypto.subtle.digest("SHA-256", enc.encode(s)));
+}
+
 async function passwordHash(password, salt) {
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({name:"PBKDF2",salt:enc.encode(salt),iterations:210000,hash:"SHA-256"},key,256);
+  const bits = await crypto.subtle.deriveBits({
+    name:"PBKDF2",
+    salt:enc.encode(salt),
+    iterations:100000,
+    hash:"SHA-256"
+  },key,256);
   return `${salt}.${b64(bits)}`;
 }
+
 async function verifyPassword(password, stored) {
   const [salt, expected] = String(stored).split(".");
   if (!salt || !expected) return false;
   const actual = (await passwordHash(password,salt)).split(".")[1];
   return actual === expected;
 }
+
 async function sign(value, secret) {
   const key = await crypto.subtle.importKey("raw",enc.encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
   return b64(await crypto.subtle.sign("HMAC",key,enc.encode(value)));
 }
+
 async function makeSession(user, env) {
   const token = b64(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = await digest(token);
@@ -28,9 +44,11 @@ async function makeSession(user, env) {
   await env.DB.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)").bind(tokenHash,user.id,expires).run();
   return token;
 }
+
 function cookie(request) {
   return (request.headers.get("Cookie")||"").split(";").map(x=>x.trim()).find(x=>x.startsWith("baza_session="))?.slice(13) || null;
 }
+
 async function currentUser(request, env) {
   const token = cookie(request);
   if (!token) return null;
@@ -40,13 +58,17 @@ async function currentUser(request, env) {
     WHERE s.token_hash=? AND s.expires_at>? AND u.active=1`).bind(tokenHash,new Date().toISOString()).first();
   return row || null;
 }
+
 const requireUser = async (req,env) => {
   const user = await currentUser(req,env);
   return user ? {user} : {response:json({error:"Требуется вход в систему"},401)};
 };
+
 const adminOnly = user => user.role === "admin";
+
 async function api(request, env) {
   const url = new URL(request.url), path=url.pathname, method=request.method;
+
   if (!env.SESSION_SECRET) return json({error:"Не задан SESSION_SECRET в настройках Worker"},500);
 
   if (path === "/api/setup" && method==="POST") {
@@ -82,30 +104,43 @@ async function api(request, env) {
   const user=auth.user;
 
   if(path==="/api/me" && method==="GET") return json({user});
+
   if(path==="/api/organizations" && method==="GET") {
     const rows=await env.DB.prepare("SELECT id,name FROM organizations ORDER BY name").all();
     return json({organizations:rows.results});
   }
+
   if(path==="/api/organizations" && method==="POST") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const body=await request.json();
     if(!body.name?.trim()) return json({error:"Введите название организации"},400);
-    try { const r=await env.DB.prepare("INSERT INTO organizations(name) VALUES(?)").bind(body.name.trim()).run(); return json({ok:true,id:r.meta.last_row_id}); }
-    catch { return json({error:"Такая организация уже существует"},409); }
+    try {
+      const r=await env.DB.prepare("INSERT INTO organizations(name) VALUES(?)").bind(body.name.trim()).run();
+      return json({ok:true,id:r.meta.last_row_id});
+    } catch {
+      return json({error:"Такая организация уже существует"},409);
+    }
   }
+
   if(path==="/api/users" && method==="GET") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const rows=await env.DB.prepare("SELECT id,username,full_name,role,organization_id,active FROM users ORDER BY full_name").all();
     return json({users:rows.results});
   }
+
   if(path==="/api/users" && method==="POST") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const b=await request.json();
     if(!b.username||!b.fullName||!b.password||b.password.length<12) return json({error:"Заполните ФИО, логин и пароль от 12 символов"},400);
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))), hash=await passwordHash(b.password,salt);
-    try { const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role,organization_id) VALUES(?,?,?,?,?)").bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer",b.organizationId||null).run(); return json({ok:true,id:r.meta.last_row_id}); }
-    catch { return json({error:"Логин уже занят"},409); }
+    try {
+      const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role,organization_id) VALUES(?,?,?,?,?)").bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer",b.organizationId||null).run();
+      return json({ok:true,id:r.meta.last_row_id});
+    } catch {
+      return json({error:"Логин уже занят"},409);
+    }
   }
+
   if(path==="/api/tasks" && method==="GET") {
     const rows=await env.DB.prepare(`SELECT t.*,u.full_name assigned_name,c.full_name creator_name
       FROM tasks t LEFT JOIN users u ON u.id=t.assigned_to JOIN users c ON c.id=t.created_by
@@ -113,6 +148,7 @@ async function api(request, env) {
       ORDER BY CASE WHEN t.status='Выполнено' THEN 1 ELSE 0 END,t.due_date`).bind(user.role,user.organization_id,user.id,user.id).all();
     return json({tasks:rows.results});
   }
+
   if(path==="/api/tasks" && method==="POST") {
     const b=await request.json();
     if(!b.title?.trim()) return json({error:"Введите название задания"},400);
@@ -120,6 +156,7 @@ async function api(request, env) {
       .bind(user.organization_id,b.title.trim(),b.description||"",b.assignedTo||null,user.id,b.dueDate||null).run();
     return json({ok:true,id:r.meta.last_row_id});
   }
+
   if(path.startsWith("/api/tasks/") && method==="PATCH") {
     const id=Number(path.split("/").pop()), b=await request.json();
     const status=["Новая","В работе","На проверке","Выполнено"].includes(b.status)?b.status:null;
@@ -130,6 +167,7 @@ async function api(request, env) {
     await env.DB.prepare("UPDATE tasks SET status=? WHERE id=?").bind(status,id).run();
     return json({ok:true});
   }
+
   if(path==="/api/checklist" && method==="GET") {
     const date=url.searchParams.get("date")||new Date().toISOString().slice(0,10);
     const rows=await env.DB.prepare(`SELECT i.id,i.title,e.result,e.comment FROM checklist_items i
@@ -138,6 +176,7 @@ async function api(request, env) {
       .bind(user.id,date,user.organization_id).all();
     return json({date,items:rows.results});
   }
+
   if(path==="/api/checklist/items" && method==="POST") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const b=await request.json();
@@ -145,6 +184,7 @@ async function api(request, env) {
     const r=await env.DB.prepare("INSERT INTO checklist_items(organization_id,title) VALUES(?,?)").bind(b.organizationId||null,b.title.trim()).run();
     return json({ok:true,id:r.meta.last_row_id});
   }
+
   if(path==="/api/checklist/entries" && method==="POST") {
     const b=await request.json();
     if(!b.itemId||!["Выполнено","Нарушение","Не применимо"].includes(b.result)) return json({error:"Проверьте результат обхода"},400);
@@ -154,10 +194,12 @@ async function api(request, env) {
       .bind(b.itemId,user.id,date,b.result,b.comment||"").run();
     return json({ok:true});
   }
+
   if(path==="/api/documents" && method==="GET") {
     const rows=await env.DB.prepare("SELECT id,title,content_type,uploaded_at FROM documents WHERE engineer_id=? ORDER BY uploaded_at DESC").bind(user.id).all();
     return json({documents:rows.results});
   }
+
   if(path==="/api/documents" && method==="POST") {
     const form=await request.formData(), file=form.get("file"), title=String(form.get("title")||file?.name||"Документ");
     if(!(file instanceof File) || file.size>15*1024*1024) return json({error:"Файл не выбран или превышает 15 МБ"},400);
@@ -167,6 +209,7 @@ async function api(request, env) {
       .bind(user.organization_id,user.id,title,key,file.type||"application/octet-stream").run();
     return json({ok:true,id:r.meta.last_row_id});
   }
+
   if(path.startsWith("/api/documents/") && method==="GET") {
     const id=Number(path.split("/").pop());
     const doc=await env.DB.prepare("SELECT * FROM documents WHERE id=? AND engineer_id=?").bind(id,user.id).first();
@@ -175,6 +218,7 @@ async function api(request, env) {
     if(!object) return json({error:"Файл отсутствует в хранилище"},404);
     return new Response(object.body,{headers:{"content-type":doc.content_type||"application/octet-stream","content-disposition":`attachment; filename*=UTF-8''${encodeURIComponent(doc.title)}`,"cache-control":"private, no-store"}});
   }
+
   return json({error:"Маршрут не найден"},404);
 }
 
@@ -182,11 +226,12 @@ export default {
   async fetch(request, env) {
     const url=new URL(request.url);
     if(url.pathname.startsWith("/api/")) {
-      try { return await api(request,env); }
-      catch(e) {
-  console.error("API error:", String(e));
-  return json({error:"Внутренняя ошибка сервера"},500);
-}
+      try {
+        return await api(request,env);
+      } catch(e) {
+        console.error("API error:", String(e));
+        return json({error:"Внутренняя ошибка сервера"},500);
+      }
     }
     return env.ASSETS.fetch(request);
   }
