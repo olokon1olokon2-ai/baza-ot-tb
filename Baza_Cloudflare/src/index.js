@@ -8,7 +8,7 @@ const unb64 = s => Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")), 
 async function digest(s) { return b64(await crypto.subtle.digest("SHA-256", enc.encode(s))); }
 async function passwordHash(password, salt) {
   const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({name:"PBKDF2",salt:enc.encode(salt),iterations:210000,hash:"SHA-256"},key,256);
+  const bits = await crypto.subtle.deriveBits({name:"PBKDF2",salt:enc.encode(salt),iterations:100000,hash:"SHA-256"},key,256);
   return `${salt}.${b64(bits)}`;
 }
 async function verifyPassword(password, stored) {
@@ -54,6 +54,21 @@ async function getTaskAccess(env,user,id) {
 async function api(request, env) {
   const url = new URL(request.url), path=url.pathname, method=request.method;
   if (!env.SESSION_SECRET) return json({error:"Не задан SESSION_SECRET в настройках Worker"},500);
+
+  if (path === "/api/admin/recover-password" && method==="POST") {
+    const body=await request.json();
+    if (!env.SETUP_SECRET || body.setupSecret !== env.SETUP_SECRET) return json({error:"Неверный код восстановления"},403);
+    const username=String(body.username||"").trim();
+    const password=String(body.password||"");
+    if (!username || password.length<12) return json({error:"Укажите логин администратора и новый пароль не короче 12 символов"},400);
+    const user=await env.DB.prepare("SELECT id,role FROM users WHERE username=? AND active=1").bind(username).first();
+    if (!user || user.role!=="admin") return json({error:"Активный администратор с таким логином не найден"},404);
+    const salt=b64(crypto.getRandomValues(new Uint8Array(16)));
+    const hash=await passwordHash(password,salt);
+    await env.DB.prepare("UPDATE users SET password_hash=? WHERE id=?").bind(hash,user.id).run();
+    await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id).run();
+    return json({ok:true,message:"Пароль администратора обновлён. Войдите с новым паролем."});
+  }
 
   if (path === "/api/setup" && method==="POST") {
     const body=await request.json();
