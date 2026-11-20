@@ -117,20 +117,9 @@ async function api(request, env) {
     }
     return json({ok:true,saved:statements.length,published:b.publish===true});
   }
-  if(path==="/api/organizations" && method==="GET") {
-    const rows=await env.DB.prepare("SELECT id,name FROM organizations ORDER BY name").all();
-    return json({organizations:rows.results});
-  }
-  if(path==="/api/organizations" && method==="POST") {
-    if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
-    const body=await request.json();
-    if(!body.name?.trim()) return json({error:"Введите название организации"},400);
-    try { const r=await env.DB.prepare("INSERT INTO organizations(name) VALUES(?)").bind(body.name.trim()).run(); return json({ok:true,id:r.meta.last_row_id}); }
-    catch { return json({error:"Такая организация уже существует"},409); }
-  }
   if(path==="/api/users" && method==="GET") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
-    const rows=await env.DB.prepare("SELECT id,username,full_name,role,organization_id,active FROM users ORDER BY full_name").all();
+    const rows=await env.DB.prepare("SELECT id,username,full_name,role,active FROM users ORDER BY full_name").all();
     return json({users:rows.results});
   }
   if(path==="/api/users" && method==="POST") {
@@ -138,22 +127,29 @@ async function api(request, env) {
     const b=await request.json();
     if(!b.username||!b.fullName||!b.password||b.password.length<12) return json({error:"Заполните ФИО, логин и пароль от 12 символов"},400);
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))), hash=await passwordHash(b.password,salt);
-    try { const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role,organization_id) VALUES(?,?,?,?,?)").bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer",b.organizationId||null).run(); return json({ok:true,id:r.meta.last_row_id}); }
+    try { const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,?)").bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer").run(); return json({ok:true,id:r.meta.last_row_id}); }
     catch { return json({error:"Логин уже занят"},409); }
   }
   if(path==="/api/tasks" && method==="GET") {
     const rows=await env.DB.prepare(`SELECT t.*,u.full_name assigned_name,c.full_name creator_name
       FROM tasks t LEFT JOIN users u ON u.id=t.assigned_to JOIN users c ON c.id=t.created_by
-      WHERE (?='admin' OR t.organization_id IS ? OR t.assigned_to=? OR t.created_by=?)
-      ORDER BY CASE WHEN t.status='Выполнено' THEN 1 ELSE 0 END,t.due_date`).bind(user.role,user.organization_id,user.id,user.id).all();
+      ORDER BY CASE WHEN t.status='Выполнено' THEN 1 ELSE 0 END,t.due_date`).all();
     return json({tasks:rows.results});
   }
   if(path==="/api/tasks" && method==="POST") {
     const b=await request.json();
     if(!b.title?.trim()) return json({error:"Введите название задания"},400);
-    const r=await env.DB.prepare("INSERT INTO tasks(organization_id,title,description,assigned_to,created_by,due_date) VALUES(?,?,?,?,?,?)")
-      .bind(user.organization_id,b.title.trim(),b.description||"",b.assignedTo||null,user.id,b.dueDate||null).run();
+    const r=await env.DB.prepare("INSERT INTO tasks(title,description,assigned_to,created_by,due_date) VALUES(?,?,?,?,?)")
+      .bind(b.title.trim(),b.description||"",b.assignedTo||null,user.id,b.dueDate||null).run();
     return json({ok:true,id:r.meta.last_row_id});
+  }
+  if(path.startsWith("/api/tasks/") && method==="DELETE") {
+    if(!adminOnly(user)) return json({error:"Удалять задания может только администратор"},403);
+    const id=Number(path.split("/").pop());
+    if(!Number.isInteger(id) || id<1) return json({error:"Неверный номер задания"},400);
+    const result=await env.DB.prepare("DELETE FROM tasks WHERE id=?").bind(id).run();
+    if(!result.meta.changes) return json({error:"Задание не найдено"},404);
+    return json({ok:true});
   }
   if(path.startsWith("/api/tasks/") && method==="PATCH") {
     const id=Number(path.split("/").pop()), b=await request.json();
@@ -169,15 +165,14 @@ async function api(request, env) {
     const date=url.searchParams.get("date")||new Date().toISOString().slice(0,10);
     const rows=await env.DB.prepare(`SELECT i.id,i.title,e.result,e.comment FROM checklist_items i
       LEFT JOIN checklist_entries e ON e.item_id=i.id AND e.engineer_id=? AND e.check_date=?
-      WHERE i.active=1 AND (i.organization_id IS NULL OR i.organization_id IS ?) ORDER BY i.sort_order,i.id`)
-      .bind(user.id,date,user.organization_id).all();
+      WHERE i.active=1 ORDER BY i.sort_order,i.id`).bind(user.id,date).all();
     return json({date,items:rows.results});
   }
   if(path==="/api/checklist/items" && method==="POST") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const b=await request.json();
     if(!b.title?.trim()) return json({error:"Введите пункт чек-листа"},400);
-    const r=await env.DB.prepare("INSERT INTO checklist_items(organization_id,title) VALUES(?,?)").bind(b.organizationId||null,b.title.trim()).run();
+    const r=await env.DB.prepare("INSERT INTO checklist_items(title) VALUES(?)").bind(b.title.trim()).run();
     return json({ok:true,id:r.meta.last_row_id});
   }
   if(path==="/api/checklist/entries" && method==="POST") {
@@ -198,8 +193,8 @@ async function api(request, env) {
     if(!(file instanceof File) || file.size>15*1024*1024) return json({error:"Файл не выбран или превышает 15 МБ"},400);
     const key=`${user.organization_id||"general"}/${user.id}/${crypto.randomUUID()}`;
     await env.FILES.put(key,file.stream(),{httpMetadata:{contentType:file.type||"application/octet-stream"}});
-    const r=await env.DB.prepare("INSERT INTO documents(organization_id,engineer_id,title,file_key,content_type) VALUES(?,?,?,?,?)")
-      .bind(user.organization_id,user.id,title,key,file.type||"application/octet-stream").run();
+    const r=await env.DB.prepare("INSERT INTO documents(engineer_id,title,file_key,content_type) VALUES(?,?,?,?)")
+      .bind(user.id,title,key,file.type||"application/octet-stream").run();
     return json({ok:true,id:r.meta.last_row_id});
   }
   if(path.startsWith("/api/documents/") && method==="GET") {
