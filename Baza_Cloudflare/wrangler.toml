@@ -9,7 +9,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "baza-ot-tb"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "fe8348b1-5adf-4138-8f6e-4e485b82874a"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
