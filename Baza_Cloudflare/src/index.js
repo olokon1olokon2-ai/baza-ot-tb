@@ -136,6 +136,16 @@ async function api(request, env) {
     try { const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,?)").bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer").run(); return json({ok:true,id:r.meta.last_row_id}); }
     catch { return json({error:"Логин уже занят"},409); }
   }
+  if(path.startsWith("/api/users/") && method==="DELETE") {
+    if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
+    const id=Number(path.split("/").pop());
+    if(!Number.isInteger(id)||id<1) return json({error:"Неверный пользователь"},400);
+    if(id===user.id) return json({error:"Нельзя удалить собственную учётную запись"},400);
+    const target=await env.DB.prepare("SELECT id,active FROM users WHERE id=?").bind(id).first();
+    if(!target) return json({error:"Пользователь не найден"},404);
+    await env.DB.prepare("UPDATE users SET active=0 WHERE id=?").bind(id).run();
+    return json({ok:true,disabled:true});
+  }
   if(path==="/api/tasks" && method==="GET") {
     const rows=await env.DB.prepare(`SELECT t.*,u.full_name assigned_name,c.full_name creator_name
       FROM tasks t LEFT JOIN users u ON u.id=t.assigned_to JOIN users c ON c.id=t.created_by
@@ -224,7 +234,7 @@ async function api(request, env) {
   }
   if(path==="/api/checklist" && method==="GET") {
     const date=url.searchParams.get("date")||new Date().toISOString().slice(0,10);
-    const rows=await env.DB.prepare(`SELECT i.id,i.title,e.result,e.comment FROM checklist_items i
+    const rows=await env.DB.prepare(`SELECT i.id,i.title,i.category,e.result,e.comment FROM checklist_items i
       LEFT JOIN checklist_entries e ON e.item_id=i.id AND e.engineer_id=? AND e.check_date=?
       WHERE i.active=1 ORDER BY i.sort_order,i.id`).bind(user.id,date).all();
     return json({date,items:rows.results});
@@ -233,7 +243,8 @@ async function api(request, env) {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const b=await request.json();
     if(!b.title?.trim()) return json({error:"Введите пункт чек-листа"},400);
-    const r=await env.DB.prepare("INSERT INTO checklist_items(title) VALUES(?)").bind(b.title.trim()).run();
+    const category=String(b.category||"Общие требования").trim()||"Общие требования";
+    const r=await env.DB.prepare("INSERT INTO checklist_items(title,category) VALUES(?,?)").bind(b.title.trim(),category).run();
     return json({ok:true,id:r.meta.last_row_id});
   }
   if(path==="/api/checklist/entries" && method==="POST") {
