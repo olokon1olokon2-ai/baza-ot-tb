@@ -109,7 +109,7 @@ async function api(request, env) {
     const slingers=url.searchParams.get("slingers")==="1";
     const state=await env.DB.prepare("SELECT active_batch_id FROM employee_import_state WHERE id=1").first();
     if(!state?.active_batch_id) return json({employees:[],total:0});
-    let sql="SELECT id,employee_name,position,employer,instruction_date,form_o86_value,form_086_value,has_medical_certificate,slinger_certificate FROM employees WHERE batch_id=?";
+    let sql="SELECT id,employee_name,position,employer,instruction_date,form_o86_value,form_086_value,has_medical_certificate,slinger_certificate,slinger_expiry_date FROM employees WHERE batch_id=?";
     const args=[state.active_batch_id];
     if(q){sql+=" AND employee_name LIKE ?";args.push("%"+q+"%");}
     if(slingers) sql+=" AND COALESCE(slinger_certificate,'')<>'' AND LOWER(slinger_certificate) NOT IN ('нет','no','-','0')";
@@ -126,10 +126,10 @@ async function api(request, env) {
       const name=String(r.employee_name||"").trim();
       const sourceKey=String(r.source_key||"").trim();
       if(!name || !sourceKey) continue;
-      statements.push(env.DB.prepare(`INSERT INTO employees(batch_id,source_key,employee_name,position,employer,instruction_date,form_o86_value,form_086_value,has_medical_certificate,slinger_certificate)
-        VALUES(?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(batch_id,source_key) DO UPDATE SET employee_name=excluded.employee_name,position=excluded.position,employer=excluded.employer,instruction_date=excluded.instruction_date,form_o86_value=excluded.form_o86_value,form_086_value=excluded.form_086_value,has_medical_certificate=excluded.has_medical_certificate,slinger_certificate=excluded.slinger_certificate,updated_at=CURRENT_TIMESTAMP`)
-        .bind(String(b.batchId),sourceKey,name,String(r.position||""),String(r.employer||""),r.instruction_date||null,String(r.form_o86_value||""),String(r.form_086_value||""),r.has_medical_certificate?1:0,String(r.slinger_certificate||"")));
+      statements.push(env.DB.prepare(`INSERT INTO employees(batch_id,source_key,employee_name,position,employer,instruction_date,form_o86_value,form_086_value,has_medical_certificate,slinger_certificate,slinger_expiry_date)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(batch_id,source_key) DO UPDATE SET employee_name=excluded.employee_name,position=excluded.position,employer=excluded.employer,instruction_date=excluded.instruction_date,form_o86_value=excluded.form_o86_value,form_086_value=excluded.form_086_value,has_medical_certificate=excluded.has_medical_certificate,slinger_certificate=excluded.slinger_certificate,slinger_expiry_date=excluded.slinger_expiry_date,updated_at=CURRENT_TIMESTAMP`)
+        .bind(String(b.batchId),sourceKey,name,String(r.position||""),String(r.employer||""),r.instruction_date||null,String(r.form_o86_value||""),String(r.form_086_value||""),r.has_medical_certificate?1:0,String(r.slinger_certificate||""),r.slinger_expiry_date||null));
     }
     if(statements.length) await env.DB.batch(statements);
     if(b.publish===true) {
