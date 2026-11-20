@@ -234,10 +234,18 @@ async function api(request, env) {
   }
   if(path==="/api/checklist" && method==="GET") {
     const date=url.searchParams.get("date")||new Date().toISOString().slice(0,10);
-    const rows=await env.DB.prepare(`SELECT i.id,i.title,i.category,e.result,e.comment FROM checklist_items i
-      LEFT JOIN checklist_entries e ON e.item_id=i.id AND e.engineer_id=? AND e.check_date=?
-      WHERE i.active=1 ORDER BY i.sort_order,i.id`).bind(user.id,date).all();
+    const rows=adminOnly(user)
+      ? await env.DB.prepare(`SELECT i.id,i.title,i.category,e.id entry_id,e.engineer_id,e.check_date,e.result,e.comment,u.full_name engineer_name FROM checklist_items i LEFT JOIN checklist_entries e ON e.item_id=i.id AND e.check_date=? LEFT JOIN users u ON u.id=e.engineer_id WHERE i.active=1 ORDER BY i.sort_order,i.id,e.engineer_id`).bind(date).all()
+      : await env.DB.prepare(`SELECT i.id,i.title,i.category,e.id entry_id,e.engineer_id,e.check_date,e.result,e.comment,u.full_name engineer_name FROM checklist_items i LEFT JOIN checklist_entries e ON e.item_id=i.id AND e.engineer_id=? AND e.check_date=? LEFT JOIN users u ON u.id=e.engineer_id WHERE i.active=1 ORDER BY i.sort_order,i.id`).bind(user.id,date).all();
     return json({date,items:rows.results});
+  }
+  if(path==="/api/checklist/entries" && method==="DELETE") {
+    if(!adminOnly(user)) return json({error:"Удалять обходы может только администратор"},403);
+    const b=await request.json(), entryId=Number(b.entryId);
+    if(!Number.isInteger(entryId)||entryId<1) return json({error:"Не выбрана запись обхода"},400);
+    const r=await env.DB.prepare("DELETE FROM checklist_entries WHERE id=?").bind(entryId).run();
+    if(!r.meta.changes) return json({error:"Запись обхода не найдена"},404);
+    return json({ok:true});
   }
   if(path==="/api/checklist/items" && method==="POST") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
