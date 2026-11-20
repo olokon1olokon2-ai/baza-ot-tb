@@ -80,7 +80,7 @@ function headerIndexExcel(headers,terms){return headers.findIndex(h=>terms.some(
 function excelDateISO(rawDate){
  if(rawDate instanceof Date&&!isNaN(rawDate))return rawDate.toISOString().slice(0,10);
  if(typeof rawDate==='number'&&rawDate>0){const d=XLSX.SSF.parse_date_code(rawDate);if(d)return [d.y,String(d.m).padStart(2,'0'),String(d.d).padStart(2,'0')].join('-')}
- if(String(rawDate??'').trim()){const v=String(rawDate).trim(),m=v.match(/^(\\d{1,2})[.\\/](\\d{1,2})[.\\/](\\d{4})$/);if(m)return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');if(/^\\d{4}-\\d{2}-\\d{2}$/.test(v))return v}
+ if(String(rawDate??'').trim()){const v=String(rawDate).trim(),p=v.includes('.')?v.split('.'):v.split('/');if(p.length===3&&p[2].length===4&&p.every(x=>/^\\d+$/.test(x)))return p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');if(v.length===10&&v[4]==='-'&&v[7]==='-')return v}
  return '';
 }
 function parseEmployeeWorkbook(wb){
