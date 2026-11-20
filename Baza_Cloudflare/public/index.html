@@ -125,4 +125,5 @@ async function loadAll(){try{await Promise.all([loadTasks(),loadChecklist(),load
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function init(){try{const d=await api('/me');me=d.user;showApp()}catch{showLogin()}}
 init();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(err=>console.warn('PWA worker:',err)));}
 </script></body></html>
