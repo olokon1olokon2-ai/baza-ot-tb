@@ -162,7 +162,10 @@ async function api(request, env) {
     return json({ok:true,disabled:true});
   }
   if(path==="/api/tasks" && method==="GET") {
-    const rows=await env.DB.prepare(`SELECT t.*,u.full_name assigned_name,c.full_name creator_name
+    const rows=await env.DB.prepare(`SELECT t.*,u.full_name assigned_name,c.full_name creator_name,
+      (SELECT hu.full_name FROM task_history h JOIN users hu ON hu.id=h.user_id WHERE h.task_id=t.id AND h.new_status='В работе' ORDER BY h.created_at DESC,h.id DESC LIMIT 1) in_progress_by_name,
+      (SELECT hu.full_name FROM task_history h JOIN users hu ON hu.id=h.user_id WHERE h.task_id=t.id AND h.new_status='На проверке' ORDER BY h.created_at DESC,h.id DESC LIMIT 1) review_by_name,
+      (SELECT hu.full_name FROM task_history h JOIN users hu ON hu.id=h.user_id WHERE h.task_id=t.id AND h.new_status='Выполнено' ORDER BY h.created_at DESC,h.id DESC LIMIT 1) completed_by_name
       FROM tasks t LEFT JOIN users u ON u.id=t.assigned_to JOIN users c ON c.id=t.created_by
       ORDER BY CASE WHEN t.status='Выполнено' THEN 1 ELSE 0 END,t.due_date`).all();
     return json({tasks:rows.results});
@@ -206,7 +209,10 @@ async function api(request, env) {
         createdKeys.push(key);
         await env.DB.prepare("INSERT INTO task_videos(task_id,uploaded_by,file_key,content_type,original_name,size_bytes) VALUES(?,?,?,?,?,?)").bind(id,user.id,key,file.type,file.name||"video",file.size).run();
       }
-      await env.DB.prepare("UPDATE tasks SET completion_comment=?,submitted_at=?,status='На проверке' WHERE id=?").bind(comment,new Date().toISOString(),id).run();
+      const submittedAt=new Date().toISOString();
+      await env.DB.prepare("UPDATE tasks SET completion_comment=?,submitted_at=?,status='На проверке' WHERE id=?").bind(comment,submittedAt,id).run();
+      await env.DB.prepare("INSERT INTO task_history(task_id,user_id,old_status,new_status,comment) VALUES(?,?,?,?,?)")
+        .bind(id,user.id,access.task.status,"На проверке",comment||"Отчёт отправлен на проверку").run();
       return json({ok:true});
     } catch(e) {
       for(const key of createdKeys) await env.FILES.delete(key).catch(()=>{});
@@ -244,7 +250,11 @@ async function api(request, env) {
     const task=await env.DB.prepare("SELECT * FROM tasks WHERE id=?").bind(id).first();
     if(!task) return json({error:"Задание не найдено"},404);
     if(user.role!=="admin" && task.assigned_to!==user.id && task.created_by!==user.id) return json({error:"Нет доступа"},403);
-    await env.DB.prepare("UPDATE tasks SET status=? WHERE id=?").bind(status,id).run();
+    if(task.status!==status) {
+      await env.DB.prepare("UPDATE tasks SET status=? WHERE id=?").bind(status,id).run();
+      await env.DB.prepare("INSERT INTO task_history(task_id,user_id,old_status,new_status) VALUES(?,?,?,?)")
+        .bind(id,user.id,task.status,status).run();
+    }
     return json({ok:true});
   }
   if(path==="/api/checklist" && method==="GET") {
