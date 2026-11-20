@@ -12,21 +12,22 @@
 <section id="login" class="panel"><h2>Вход в систему</h2><form id="loginForm"><input name="username" placeholder="Логин" required><input name="password" type="password" placeholder="Пароль" required><button>Войти</button></form><p id="loginMsg" class="muted"></p><button class="secondary" onclick="showSetup()">Первоначальная настройка</button></section>
 <section id="setup" class="panel hidden"><h2>Создать администратора</h2><p class="muted">Однократно. Код настройки задаётся в Cloudflare как SETUP_SECRET.</p><form id="setupForm"><input name="setupSecret" placeholder="Код настройки" required><input name="fullName" placeholder="ФИО администратора" required><input name="username" placeholder="Логин" required><input name="password" type="password" minlength="12" placeholder="Пароль (не менее 12 символов)" required><button>Создать администратора</button></form><p id="setupMsg"></p><button class="secondary" onclick="showLogin()">Назад</button></section>
 <section id="app" class="hidden">
-<div class="panel"><div class="tabs"><button onclick="tab('tasks')">Задания</button><button onclick="tab('checklist')">Ежедневный обход</button><button onclick="tab('docs')">Документы</button><button id="adminTab" class="secondary hidden" onclick="tab('admin')">Администрирование</button><button class="secondary" onclick="logout()">Выйти</button></div>
+<div class="panel"><div class="tabs"><button onclick="tab('tasks')">Задания</button><button onclick="tab('checklist')">Ежедневный обход</button><button onclick="tab('docs')">Документы</button><button onclick="tab('employees')">Работники</button><button id="adminTab" class="secondary hidden" onclick="tab('admin')">Администрирование</button><button class="secondary" onclick="logout()">Выйти</button></div>
 <div id="tasks"><h2>Задания для устранения</h2><form id="taskForm"><input name="title" placeholder="Название задания" required><textarea name="description" placeholder="Описание нарушения и необходимые меры"></textarea><div class="row"><input name="dueDate" type="date"><input name="assignedTo" type="number" placeholder="ID исполнителя"></div><button>Создать задание</button></form><div id="taskList"></div></div>
 <div id="checklist" class="hidden"><h2>Чек-лист ежедневного обхода</h2><input id="checkDate" type="date"><div id="checkList"></div></div>
-<div id="docs" class="hidden"><h2>Документы инженера</h2><form id="docForm"><input name="title" placeholder="Название документа"><input name="file" type="file" required><button>Загрузить документ (до 15 МБ)</button></form><div id="docList"></div></div>
+<div id="employees" class="hidden"><h2>Работники</h2><input id="employeeSearch" type="search" placeholder="Поиск по ФИО"><button type="button" onclick="loadEmployees()">Найти</button><button type="button" class="secondary" onclick="employeeFilter='all';loadEmployees()">Все работники</button><button type="button" class="secondary" onclick="employeeFilter='slingers';loadEmployees()">Стропальщики</button><div id="employeeCount" class="muted">Общая база работников</div><div id="employeeList"></div><div id="employeeImport" class="item hidden"><h3>Загрузить / обновить базу из Excel</h3><p class="muted">Импортируется лист «ВВодный 2025-2026». Сохраняются ФИО, должность, подрядная организация, дата вводного инструктажа, форма О-86/086 и удостоверение стропальщика.</p><input id="employeeExcel" type="file" accept=".xlsx,.xls"><button id="employeeUpload" type="button" onclick="uploadEmployees()">Загрузить и опубликовать базу</button><div id="employeeUploadMsg" class="muted"></div></div></div><div id="docs" class="hidden"><h2>Документы инженера</h2><form id="docForm"><input name="title" placeholder="Название документа"><input name="file" type="file" required><button>Загрузить документ (до 15 МБ)</button></form><div id="docList"></div></div>
 <div id="admin" class="hidden"><h2>Администрирование</h2><h3>Организации</h3><form id="orgForm"><input name="name" placeholder="Название организации" required><button>Добавить организацию</button></form><div id="orgList"></div><h3>Пользователи</h3><form id="userForm"><input name="fullName" placeholder="ФИО инженера" required><input name="username" placeholder="Логин" required><input name="password" type="password" minlength="12" placeholder="Пароль от 12 символов" required><select name="organizationId" id="orgSelect"><option value="">Без организации</option></select><select name="role"><option value="engineer">Инженер ОТ и ТБ</option><option value="admin">Администратор</option></select><button>Создать пользователя</button></form><div id="userList"></div><h3>Пункты чек-листа</h3><form id="checkItemForm"><input name="title" placeholder="Например: Проверка СИЗ и ограждений" required><button>Добавить пункт</button></form></div>
 </div></section>
 <p class="muted">Доступ к документам осуществляется через авторизацию. Не размещайте секреты и пароли в публичных файлах.</p>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-const $=s=>document.querySelector(s);let me=null;
+const $=s=>document.querySelector(s);let me=null;let employeeFilter="all";
 async function api(path,opts={}){const r=await fetch('/api'+path,{...opts,headers:opts.body instanceof FormData?opts.headers:{'content-type':'application/json',...(opts.headers||{})}});const d= r.headers.get('content-type')?.includes('application/json')?await r.json():r;if(!r.ok)throw Error(d.error||'Ошибка запроса');return d}
 function showLogin(){$('#login').classList.remove('hidden');$('#setup').classList.add('hidden')}
 function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.remove('hidden')}
 function showApp(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':'Инженер ОТ и ТБ');$('#adminTab').classList.toggle('hidden',me.role!=='admin');tab('tasks');loadAll()}
-function tab(name){['tasks','checklist','docs','admin'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));}
+function tab(name){['tasks','checklist','docs','admin','employees'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='employees'){if(me.role==='admin')$('#employeeImport').classList.remove('hidden');loadEmployees()}}
 function msg(id,t,cls=''){const e=$(id);e.textContent=t;e.className=cls}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api('/login',{method:'POST',body:JSON.stringify(b)});await init()}catch(x){msg('#loginMsg',x.message,'error')}};
 $('#setupForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/setup',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});msg('#setupMsg','Администратор создан. Теперь войдите.','success');showLogin()}catch(x){msg('#setupMsg',x.message,'error')}};
@@ -43,6 +44,61 @@ $('#orgForm').onsubmit=async e=>{e.preventDefault();try{await api('/organization
 $('#userForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api('/users',{method:'POST',body:JSON.stringify(b)});e.target.reset();loadAdmin()}catch(x){alert(x.message)}};
 $('#checkItemForm').onsubmit=async e=>{e.preventDefault();try{await api('/checklist/items',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});e.target.reset();loadChecklist()}catch(x){alert(x.message)}};
 async function loadAdmin(){if(me.role!=='admin')return;const [o,u]=await Promise.all([api('/organizations'),api('/users')]);$('#orgList').innerHTML=o.organizations.map(x=>`<div class="item">${esc(x.name)} <span class="muted">ID ${x.id}</span></div>`).join('');$('#orgSelect').innerHTML='<option value="">Без организации</option>'+o.organizations.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');$('#userList').innerHTML=u.users.map(x=>`<div class="item">${esc(x.full_name)} · ${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</div>`).join('')}
+
+function normExcel(s){return String(s??'').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\s+/g,' ').trim()}
+function isYesExcel(v){return ['есть','да','yes'].includes(normExcel(v))}
+function headerIndexExcel(headers,terms){return headers.findIndex(h=>terms.some(t=>normExcel(h).includes(t)))}
+function parseEmployeeWorkbook(wb){
+ const sheets=wb.SheetNames.map(n=>({name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:""})}));
+ const preferred=sheets.find(x=>normExcel(x.name)==='вводный 2025-2026')||sheets.find(x=>x.rows.some(r=>r.some(v=>normExcel(v).includes('форма 086'))));
+ if(!preferred)throw Error('Не найден лист «ВВодный 2025-2026» или колонка «Форма 086».');
+ let hi=-1,headers=[];
+ for(let i=0;i<Math.min(preferred.rows.length,15);i++){const hs=preferred.rows[i].map(v=>String(v??'').trim());if(hs.some(h=>normExcel(h).includes('ф.и.о работника'))){hi=i;headers=hs;break}}
+ if(hi<0)throw Error('Не найдена строка заголовков «Ф.И.О Работника».');
+ const ni=headerIndexExcel(headers,['ф.и.о работника','фио работника']),pi=headerIndexExcel(headers,['должность']);
+ const di=headerIndexExcel(headers,['дата прохождения вводного инструктажа']),oi=headerIndexExcel(headers,['форма о86','форма о 86']);
+ const ci=headerIndexExcel(headers,['форма 086']),ei=headerIndexExcel(headers,['подрядные бригады','подрядная организация','работодатель']);
+ const si=headerIndexExcel(headers,['стропальщики','удостоверение стропальщика']);
+ if(ni<0)throw Error('Не найдена колонка ФИО.');
+ if(oi<0&&ei<0)throw Error('Не найдена колонка организации или подрядной бригады.');
+ if(ci<0)throw Error('Не найдена колонка «Форма 086».');
+ const out=[];
+ for(let i=hi+1;i<preferred.rows.length;i++){
+  const r=preferred.rows[i],name=String(r[ni]??'').trim();if(!name)continue;
+  const org=oi>=0?String(r[oi]??'').trim():'',cert=String(r[ci]??'').trim(),employerRaw=ei>=0?String(r[ei]??'').trim():'';
+  const rawDate=di>=0?r[di]:'';
+  let date='';
+  if(rawDate instanceof Date&&!isNaN(rawDate))date=rawDate.toISOString().slice(0,10);
+  else if(typeof rawDate==='number'&&rawDate>0){const d=XLSX.SSF.parse_date_code(rawDate);if(d)date=[d.y,String(d.m).padStart(2,'0'),String(d.d).padStart(2,'0')].join('-')}
+  else if(String(rawDate).trim()){const v=String(rawDate).trim(),m=v.match(/^(\d{1,2})[.\/] (\d{1,2})[.\/] (\d{4})$/);if(m)date=m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');else if(/^\d{4}-\d{2}-\d{2}$/.test(v))date=v}
+  out.push({source_key:preferred.name+':'+(i+1),employee_name:name,position:pi>=0?String(r[pi]??'').trim():'',employer:employerRaw||(org&&!isYesExcel(org)?org:''),instruction_date:date||null,form_o86_value:org,form_086_value:cert,has_medical_certificate:isYesExcel(org)||isYesExcel(cert),slinger_certificate:si>=0?String(r[si]??'').trim():''});
+ }
+ if(!out.length)throw Error('На листе не найдены строки с ФИО.');
+ return {rows:out,sheet:preferred.name};
+}
+async function loadEmployees(){
+ const q=$('#employeeSearch').value.trim(),params=new URLSearchParams();
+ if(q)params.set('q',q);if(employeeFilter==='slingers')params.set('slingers','1');
+ try{const d=await api('/employees?'+params.toString());$('#employeeCount').textContent='Найдено работников: '+d.total;
+ $('#employeeList').innerHTML=d.employees.map(e=>'<div class="item"><b>'+esc(e.employee_name)+'</b><div class="muted">'+esc(e.position||'Должность не указана')+' · '+esc(e.employer||'Организация не указана')+'</div><div class="muted">Вводный инструктаж: '+esc(e.instruction_date||'—')+' · О-86: '+esc(e.form_o86_value||'—')+' · 086: '+esc(e.form_086_value||'—')+' · Стропальщик: '+esc(e.slinger_certificate||'—')+'</div></div>').join('')||'<p class="muted">Работники не найдены. Администратор может загрузить Excel-файл.</p>'}
+ catch(e){$('#employeeCount').textContent=e.message}
+}
+async function uploadEmployees(){
+ const file=$('#employeeExcel').files[0];if(!file)return alert('Выберите Excel-файл.');
+ const btn=$('#employeeUpload');btn.disabled=true;$('#employeeUploadMsg').textContent='Читаю Excel…';
+ try{
+  if(!window.XLSX)throw Error('Не загрузилась библиотека Excel. Обновите страницу.');
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),parsed=parseEmployeeWorkbook(wb),batchId=crypto.randomUUID(),chunk=300;
+  for(let i=0;i<parsed.rows.length;i+=chunk){const part=parsed.rows.slice(i,i+chunk),last=i+chunk>=parsed.rows.length;
+   await api('/employees/import',{method:'POST',body:JSON.stringify({batchId,rows:part,publish:last})});
+   $('#employeeUploadMsg').textContent='Загружено '+Math.min(i+chunk,parsed.rows.length)+' из '+parsed.rows.length+' работников…';
+  }
+  $('#employeeUploadMsg').textContent='Опубликована общая база: '+parsed.rows.length+' работников. Лист: '+parsed.sheet;
+  employeeFilter='all';await loadEmployees();
+ }catch(e){$('#employeeUploadMsg').textContent='Ошибка импорта: '+e.message}
+ finally{btn.disabled=false}
+}
+
 async function loadAll(){try{await Promise.all([loadTasks(),loadChecklist(),loadDocs(),loadAdmin()])}catch(e){console.error(e)}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function init(){try{const d=await api('/me');me=d.user;showApp()}catch{showLogin()}}
