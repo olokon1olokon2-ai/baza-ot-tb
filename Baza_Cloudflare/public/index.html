@@ -70,7 +70,7 @@ function parseEmployeeWorkbook(wb){
   let date='';
   if(rawDate instanceof Date&&!isNaN(rawDate))date=rawDate.toISOString().slice(0,10);
   else if(typeof rawDate==='number'&&rawDate>0){const d=XLSX.SSF.parse_date_code(rawDate);if(d)date=[d.y,String(d.m).padStart(2,'0'),String(d.d).padStart(2,'0')].join('-')}
-  else if(String(rawDate).trim()){const v=String(rawDate).trim(),m=v.match(/^(\d{1,2})[.\/] (\d{1,2})[.\/] (\d{4})$/);if(m)date=m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');else if(/^\d{4}-\d{2}-\d{2}$/.test(v))date=v}
+  else if(String(rawDate).trim()){const v=String(rawDate).trim(),m=v.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/);if(m)date=m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');else if(/^\d{4}-\d{2}-\d{2}$/.test(v))date=v}
   out.push({source_key:preferred.name+':'+(i+1),employee_name:name,position:pi>=0?String(r[pi]??'').trim():'',employer:employerRaw||(org&&!isYesExcel(org)?org:''),instruction_date:date||null,form_o86_value:org,form_086_value:cert,has_medical_certificate:isYesExcel(org)||isYesExcel(cert),slinger_certificate:si>=0?String(r[si]??'').trim():''});
  }
  if(!out.length)throw Error('На листе не найдены строки с ФИО.');
