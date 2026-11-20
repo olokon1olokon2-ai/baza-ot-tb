@@ -1,11 +1,4 @@
 -- Фото- и видеоотчёты по заданиям
-ALTER TABLE tasks ADD COLUMN completion_comment TEXT;
-ALTER TABLE tasks ADD COLUMN submitted_at TEXT;
-ALTER TABLE tasks ADD COLUMN completed_at TEXT;
-ALTER TABLE tasks ADD COLUMN reviewed_by INTEGER REFERENCES users(id);
-ALTER TABLE tasks ADD COLUMN reviewed_at TEXT;
-ALTER TABLE tasks ADD COLUMN review_comment TEXT;
-
 CREATE TABLE IF NOT EXISTS task_photos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   task_id INTEGER NOT NULL,
