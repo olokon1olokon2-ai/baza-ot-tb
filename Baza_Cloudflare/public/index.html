@@ -77,6 +77,12 @@ async function loadAdmin(){if(me.role!=='admin')return;const u=await api('/users
 function normExcel(s){return String(s??'').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\s+/g,' ').trim()}
 function isYesExcel(v){return ['есть','да','yes'].includes(normExcel(v))}
 function headerIndexExcel(headers,terms){return headers.findIndex(h=>terms.some(t=>normExcel(h).includes(t)))}
+function excelDateISO(rawDate){
+ if(rawDate instanceof Date&&!isNaN(rawDate))return rawDate.toISOString().slice(0,10);
+ if(typeof rawDate==='number'&&rawDate>0){const d=XLSX.SSF.parse_date_code(rawDate);if(d)return [d.y,String(d.m).padStart(2,'0'),String(d.d).padStart(2,'0')].join('-')}
+ if(String(rawDate??'').trim()){const v=String(rawDate).trim(),m=v.match(/^(\\d{1,2})[.\\/](\\d{1,2})[.\\/](\\d{4})$/);if(m)return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');if(/^\\d{4}-\\d{2}-\\d{2}$/.test(v))return v}
+ return '';
+}
 function parseEmployeeWorkbook(wb){
  const sheets=wb.SheetNames.map(n=>({name:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:""})}));
  const preferred=sheets.find(x=>normExcel(x.name)==='вводный 2025-2026')||sheets.find(x=>x.rows.some(r=>r.some(v=>normExcel(v).includes('форма 086'))));
@@ -88,6 +94,7 @@ function parseEmployeeWorkbook(wb){
  const di=headerIndexExcel(headers,['дата прохождения вводного инструктажа']),oi=headerIndexExcel(headers,['форма о86','форма о 86']);
  const ci=headerIndexExcel(headers,['форма 086']),ei=headerIndexExcel(headers,['подрядные бригады','подрядная организация','работодатель']);
  const si=headerIndexExcel(headers,['стропальщики','удостоверение стропальщика']);
+ const xi=headerIndexExcel(headers,['срок действия удостоверения стропальщика','дата окончания удостоверения стропальщика','действительно до','срок удостоверения стропальщика','окончание удостоверения']);
  if(ni<0)throw Error('Не найдена колонка ФИО.');
  if(oi<0&&ei<0)throw Error('Не найдена колонка организации или подрядной бригады.');
  if(ci<0)throw Error('Не найдена колонка «Форма 086».');
@@ -100,7 +107,7 @@ function parseEmployeeWorkbook(wb){
   if(rawDate instanceof Date&&!isNaN(rawDate))date=rawDate.toISOString().slice(0,10);
   else if(typeof rawDate==='number'&&rawDate>0){const d=XLSX.SSF.parse_date_code(rawDate);if(d)date=[d.y,String(d.m).padStart(2,'0'),String(d.d).padStart(2,'0')].join('-')}
   else if(String(rawDate).trim()){const v=String(rawDate).trim(),m=v.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/);if(m)date=m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');else if(/^\d{4}-\d{2}-\d{2}$/.test(v))date=v}
-  out.push({source_key:preferred.name+':'+(i+1),employee_name:name,position:pi>=0?String(r[pi]??'').trim():'',employer:employerRaw||(org&&!isYesExcel(org)?org:''),instruction_date:date||null,form_o86_value:org,form_086_value:cert,has_medical_certificate:isYesExcel(org)||isYesExcel(cert),slinger_certificate:si>=0?String(r[si]??'').trim():''});
+  out.push({source_key:preferred.name+':'+(i+1),employee_name:name,position:pi>=0?String(r[pi]??'').trim():'',employer:employerRaw||(org&&!isYesExcel(org)?org:''),instruction_date:date||null,form_o86_value:org,form_086_value:cert,has_medical_certificate:isYesExcel(org)||isYesExcel(cert),slinger_certificate:si>=0?String(r[si]??'').trim():'',slinger_expiry_date:xi>=0?(excelDateISO(r[xi])||null):null});
  }
  if(!out.length)throw Error('На листе не найдены строки с ФИО.');
  return {rows:out,sheet:preferred.name};
@@ -109,7 +116,7 @@ async function loadEmployees(){
  const q=$('#employeeSearch').value.trim(),params=new URLSearchParams();
  if(q)params.set('q',q);if(employeeFilter==='slingers')params.set('slingers','1');
  try{const d=await api('/employees?'+params.toString());$('#employeeCount').textContent='Найдено работников: '+d.total;
- $('#employeeList').innerHTML=d.employees.map(e=>'<div class="item"><b>'+esc(e.employee_name)+'</b><div class="muted">'+esc(e.position||'Должность не указана')+' · '+esc(e.employer||'Организация не указана')+'</div><div class="muted">Вводный инструктаж: '+esc(e.instruction_date||'—')+' · О-86: '+esc(e.form_o86_value||'—')+' · 086: '+esc(e.form_086_value||'—')+' · Стропальщик: '+esc(e.slinger_certificate||'—')+'</div></div>').join('')||'<p class="muted">Работники не найдены. Администратор может загрузить Excel-файл.</p>'}
+ $('#employeeList').innerHTML=d.employees.map(e=>'<div class="item"><b>'+esc(e.employee_name)+'</b><div class="muted">'+esc(e.position||'Должность не указана')+' · '+esc(e.employer||'Организация не указана')+'</div><div class="muted">Вводный инструктаж: '+esc(e.instruction_date||'—')+' · О-86: '+esc(e.form_o86_value||'—')+' · 086: '+esc(e.form_086_value||'—')+' · Стропальщик: '+esc(e.slinger_certificate||'—')+' · Удостоверение действительно до: '+esc(e.slinger_expiry_date||'—')+(e.slinger_expiry_date&&e.slinger_expiry_date<localDate()?' <span class=\"status overdue\">Просрочено</span>':'')+'</div></div>').join('')||'<p class="muted">Работники не найдены. Администратор может загрузить Excel-файл.</p>'}
  catch(e){$('#employeeCount').textContent=e.message}
 }
 async function uploadEmployees(){
