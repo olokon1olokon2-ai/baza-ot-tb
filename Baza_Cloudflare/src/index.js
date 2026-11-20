@@ -90,7 +90,7 @@ async function api(request, env) {
     if(!state?.active_batch_id) return json({employees:[],total:0});
     let sql="SELECT id,employee_name,position,employer,instruction_date,form_o86_value,form_086_value,has_medical_certificate,slinger_certificate FROM employees WHERE batch_id=?";
     const args=[state.active_batch_id];
-    if(q){sql+=" AND employee_name LIKE ?";args.push("%"+q.replace(/[\\%_]/g,"\\  if(path==="/api/me" && method==="GET") return json({user});
+    if(q){sql+=" AND employee_name LIKE ?";args.push("%"+q+"%");}
 ")+"%");}
     if(slingers) sql+=" AND COALESCE(slinger_certificate,'')<>'' AND LOWER(slinger_certificate) NOT IN ('нет','no','-','0')";
     sql+=" ORDER BY employee_name LIMIT 1000";
