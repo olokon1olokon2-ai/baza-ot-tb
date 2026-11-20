@@ -82,6 +82,42 @@ async function api(request, env) {
   const user=auth.user;
 
   if(path==="/api/me" && method==="GET") return json({user});
+
+  if(path==="/api/employees" && method==="GET") {
+    const q=(url.searchParams.get("q")||"").trim();
+    const slingers=url.searchParams.get("slingers")==="1";
+    const state=await env.DB.prepare("SELECT active_batch_id FROM employee_import_state WHERE id=1").first();
+    if(!state?.active_batch_id) return json({employees:[],total:0});
+    let sql="SELECT id,employee_name,position,employer,instruction_date,form_o86_value,form_086_value,has_medical_certificate,slinger_certificate FROM employees WHERE batch_id=?";
+    const args=[state.active_batch_id];
+    if(q){sql+=" AND employee_name LIKE ?";args.push("%"+q.replace(/[\\%_]/g,"\\  if(path==="/api/me" && method==="GET") return json({user});
+")+"%");}
+    if(slingers) sql+=" AND COALESCE(slinger_certificate,'')<>'' AND LOWER(slinger_certificate) NOT IN ('нет','no','-','0')";
+    sql+=" ORDER BY employee_name LIMIT 1000";
+    const rows=await env.DB.prepare(sql).bind(...args).all();
+    return json({employees:rows.results,total:rows.results.length});
+  }
+  if(path==="/api/employees/import" && method==="POST") {
+    if(!adminOnly(user)) return json({error:"Только администратор может загружать базу работников"},403);
+    const b=await request.json();
+    if(!b.batchId || !Array.isArray(b.rows) || b.rows.length>400) return json({error:"Передайте batchId и не более 400 строк за один запрос"},400);
+    const statements=[];
+    for(const r of b.rows) {
+      const name=String(r.employee_name||"").trim();
+      const sourceKey=String(r.source_key||"").trim();
+      if(!name || !sourceKey) continue;
+      statements.push(env.DB.prepare(`INSERT INTO employees(batch_id,source_key,employee_name,position,employer,instruction_date,form_o86_value,form_086_value,has_medical_certificate,slinger_certificate)
+        VALUES(?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(batch_id,source_key) DO UPDATE SET employee_name=excluded.employee_name,position=excluded.position,employer=excluded.employer,instruction_date=excluded.instruction_date,form_o86_value=excluded.form_o86_value,form_086_value=excluded.form_086_value,has_medical_certificate=excluded.has_medical_certificate,slinger_certificate=excluded.slinger_certificate,updated_at=CURRENT_TIMESTAMP`)
+        .bind(String(b.batchId),sourceKey,name,String(r.position||""),String(r.employer||""),r.instruction_date||null,String(r.form_o86_value||""),String(r.form_086_value||""),r.has_medical_certificate?1:0,String(r.slinger_certificate||"")));
+    }
+    if(statements.length) await env.DB.batch(statements);
+    if(b.publish===true) {
+      await env.DB.prepare("UPDATE employee_import_state SET active_batch_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=1").bind(String(b.batchId)).run();
+      await env.DB.prepare("DELETE FROM employees WHERE batch_id<>?").bind(String(b.batchId)).run();
+    }
+    return json({ok:true,saved:statements.length,published:b.publish===true});
+  }
   if(path==="/api/organizations" && method==="GET") {
     const rows=await env.DB.prepare("SELECT id,name FROM organizations ORDER BY name").all();
     return json({organizations:rows.results});
