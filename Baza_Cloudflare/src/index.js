@@ -109,7 +109,7 @@ async function api(request, env) {
     const slingers=url.searchParams.get("slingers")==="1";
     const state=await env.DB.prepare("SELECT active_batch_id FROM employee_import_state WHERE id=1").first();
     if(!state?.active_batch_id) return json({employees:[],total:0});
-    let sql="SELECT e.id,e.employee_name,e.position,e.employer,e.instruction_date,e.form_o86_value,e.form_086_value,e.has_medical_certificate,e.slinger_certificate,COALESCE((SELECT c.valid_until FROM certificates c WHERE LOWER(TRIM(c.employee_name))=LOWER(TRIM(e.employee_name)) ORDER BY c.valid_until DESC LIMIT 1),e.slinger_expiry_date) AS slinger_expiry_date FROM employees e WHERE e.batch_id=?";
+    let sql="SELECT e.id,e.employee_name,e.position,e.employer,e.instruction_date,e.form_o86_value,e.form_086_value,e.has_medical_certificate,e.slinger_certificate,e.slinger_expiry_date FROM employees e WHERE e.batch_id=?";
     const args=[state.active_batch_id];
     if(q){sql+=" AND employee_name LIKE ?";args.push("%"+q+"%");}
     if(slingers) sql+=" AND COALESCE(slinger_certificate,'')<>'' AND LOWER(slinger_certificate) NOT IN ('нет','no','-','0')";
