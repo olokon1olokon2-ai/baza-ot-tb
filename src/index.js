@@ -558,6 +558,31 @@ async function api(request, env) {
     });
   }
 
+
+  // Certificate register and expiry control
+  if (path === "/api/certificates" && method === "GET") {
+    const rows = await env.DB.prepare("SELECT id,employee_name,position,certificate_number,valid_until,updated_at FROM certificates ORDER BY valid_until,employee_name").all();
+    return json({ certificates: rows.results });
+  }
+  if (path === "/api/certificates" && method === "POST") {
+    if (!adminOnly(user)) return json({ error: "Только администратор может добавлять удостоверения" }, 403);
+    const b = await request.json();
+    if (!b.employeeName?.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(b.validUntil || "")) return json({ error: "Укажите ФИО и дату окончания" }, 400);
+    const r = await env.DB.prepare("INSERT INTO certificates(employee_name,position,certificate_number,valid_until,updated_by) VALUES(?,?,?,?,?)")
+      .bind(b.employeeName.trim(), b.position || "", b.certificateNumber || "", b.validUntil, user.id).run();
+    return json({ ok: true, id: r.meta.last_row_id });
+  }
+  const certificateMatch = path.match(/^\/api\/certificates\/(\d+)$/);
+  if (certificateMatch && method === "PATCH") {
+    if (!adminOnly(user)) return json({ error: "Только администратор может изменять удостоверения" }, 403);
+    const b = await request.json();
+    if (!b.employeeName?.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(b.validUntil || "")) return json({ error: "Проверьте ФИО и дату окончания" }, 400);
+    const result = await env.DB.prepare("UPDATE certificates SET employee_name=?,position=?,certificate_number=?,valid_until=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+      .bind(b.employeeName.trim(), b.position || "", b.certificateNumber || "", b.validUntil, user.id, Number(certificateMatch[1])).run();
+    if (!result.meta.changes) return json({ error: "Удостоверение не найдено" }, 404);
+    return json({ ok: true });
+  }
+
   return json({ error: "Маршрут не найден" }, 404);
 }
 
