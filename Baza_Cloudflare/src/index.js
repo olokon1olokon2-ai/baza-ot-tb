@@ -264,6 +264,16 @@ async function api(request, env) {
       : await env.DB.prepare(`SELECT i.id,i.title,i.category,e.id entry_id,e.engineer_id,e.check_date,e.result,e.comment,u.full_name engineer_name FROM checklist_items i LEFT JOIN checklist_entries e ON e.item_id=i.id AND e.engineer_id=? AND e.check_date=? LEFT JOIN users u ON u.id=e.engineer_id WHERE i.active=1 ORDER BY i.sort_order,i.id`).bind(user.id,date).all();
     return json({date,items:rows.results});
   }
+  if(path==="/api/checklist/items" && method==="DELETE") {
+    if(!adminOnly(user)) return json({error:"Удалять пункты обхода может только администратор"},403);
+    const b=await request.json(), itemId=Number(b.itemId);
+    if(!Number.isInteger(itemId)||itemId<1) return json({error:"Не выбран пункт обхода"},400);
+    const item=await env.DB.prepare("SELECT id FROM checklist_items WHERE id=?").bind(itemId).first();
+    if(!item) return json({error:"Пункт обхода не найден"},404);
+    await env.DB.prepare("DELETE FROM checklist_entries WHERE item_id=?").bind(itemId).run();
+    await env.DB.prepare("DELETE FROM checklist_items WHERE id=?").bind(itemId).run();
+    return json({ok:true,deletedHistory:true});
+  }
   if(path==="/api/checklist/entries" && method==="DELETE") {
     if(!adminOnly(user)) return json({error:"Удалять обходы может только администратор"},403);
     const b=await request.json(), entryId=Number(b.entryId);
