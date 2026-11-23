@@ -122,12 +122,13 @@ function resetEmployeeResults(){
  $('#slingersMode').classList.toggle('secondary',employeeFilter!=='slingers');
 }
 function setEmployeeMode(mode){employeeFilter=mode;$('#employeeSearch').value='';resetEmployeeResults()}
+function toggleEmployeeDetails(i){const el=$('#employeeDetails'+i);if(el)el.classList.toggle('hidden')}
 async function loadEmployees(){
  const q=$('#employeeSearch').value.trim(),params=new URLSearchParams();
  if(q)params.set('q',q);
  if(employeeFilter==='slingers')params.set('slingers','1');
  try{const d=await api('/employees?'+params.toString());$('#employeeCount').textContent='Найдено работников: '+d.total;
-  $('#employeeList').innerHTML=d.employees.map(e=>'<div class="item"><b>'+esc(e.employee_name)+'</b><div class="muted">'+esc(e.position||'Должность не указана')+' · '+esc(e.employer||'Организация не указана')+'</div><div class="muted">Вводный инструктаж: '+esc(e.instruction_date||'—')+' · О-86: '+esc(e.form_o86_value||'—')+' · 086: '+esc(e.form_086_value||'—')+' · Стропальщик: '+esc(e.slinger_certificate||'—')+'</div>'+slingerExpiryHtml(e)+'</div>').join('')||'<p class="muted">'+(employeeFilter==='slingers'?'Стропальщики':'Работники')+' не найдены. Администратор может загрузить Excel-файл.</p>';}
+  $('#employeeList').innerHTML=d.employees.map((e,i)=>'<div class="item"><button type="button" class="secondary" style="text-align:left;background:#f4f7f5;color:#173b32" onclick="toggleEmployeeDetails('+i+')"><b>'+esc(e.employee_name)+'</b><span class="muted"> · '+esc(e.position||'Должность не указана')+' · нажмите, чтобы открыть сведения</span>'+slingerExpiryHtml(e)+'</button><div id="employeeDetails'+i+'" class="hidden" style="padding:10px 4px 2px"><div><b>ФИО:</b> '+esc(e.employee_name)+'</div><div><b>Должность:</b> '+esc(e.position||'—')+'</div><div><b>Организация:</b> '+esc(e.employer||'—')+'</div><div><b>Вводный инструктаж:</b> '+esc(e.instruction_date||'—')+'</div><div><b>Форма О-86:</b> '+esc(e.form_o86_value||'—')+'</div><div><b>Форма 086:</b> '+esc(e.form_086_value||'—')+'</div><div><b>Удостоверение стропальщика:</b> '+esc(e.slinger_certificate||'—')+'</div>'+(e.slinger_expiry_date?'<div><b>Действительно до:</b> '+esc(formatExpiryDate(e.slinger_expiry_date))+'</div>':'<div class="muted">Дата окончания удостоверения не указана</div>')+'</div></div>').join('')||'<p class="muted">'+(employeeFilter==='slingers'?'Стропальщики':'Работники')+' не найдены. Администратор может загрузить Excel-файл.</p>';}
  catch(e){$('#employeeCount').textContent='Найдено работников: 0';$('#employeeList').innerHTML='<p class="error">'+esc(e.message)+'</p>'}
 }
 async function uploadEmployees(){
