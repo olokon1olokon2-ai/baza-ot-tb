@@ -28,14 +28,14 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 const $=s=>document.querySelector(s);let me=null;let employeeFilter="all";let taskFilter="all";let allTasks=[];
-async function api(path,opts={}){const r=await fetch('/api'+path,{...opts,headers:opts.body instanceof FormData?opts.headers:{'content-type':'application/json',...(opts.headers||{})}});const d= r.headers.get('content-type')?.includes('application/json')?await r.json():r;if(!r.ok)throw Error(d.error||'Ошибка запроса');return d}
+async function api(path,opts={}){const r=await fetch('/api'+path,{credentials:'same-origin',...opts,headers:opts.body instanceof FormData?opts.headers:{'content-type':'application/json',...(opts.headers||{})}});const d= r.headers.get('content-type')?.includes('application/json')?await r.json():r;if(!r.ok)throw Error(d.error||'Ошибка запроса');return d}
 function showLogin(){$('#login').classList.remove('hidden');$('#setup').classList.add('hidden');$('#recovery').classList.add('hidden')}
 function showRecovery(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#recovery').classList.remove('hidden')}
 function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.remove('hidden')}
 function showApp(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':'Инженер ОТ и ТБ');$('#adminTab').classList.toggle('hidden',me.role!=='admin');tab('tasks');loadAll()}
-function tab(name){['tasks','checklist','docs','admin','employees'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='employees'){if(me.role==='admin')$('#employeeImport').classList.remove('hidden');$('#employeeCount').textContent='Найдено работников: 0';$('#employeeList').innerHTML=''}}
+function tab(name){['tasks','checklist','docs','admin','employees'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='employees'){if(me.role==='admin')$('#employeeImport').classList.remove('hidden');else $('#employeeImport').classList.add('hidden');loadEmployees()}}
 function msg(id,t,cls=''){const e=$(id);e.textContent=t;e.className=cls}
-$('#loginForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target));try{await api('/login',{method:'POST',body:JSON.stringify(b)});await init()}catch(x){msg('#loginMsg',x.message,'error')}};
+$('#loginForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),btn=e.target.querySelector('button');btn.disabled=true;msg('#loginMsg','Проверяем данные…','muted');try{await api('/login',{method:'POST',body:JSON.stringify(b)});await init()}catch(x){showLogin();msg('#loginMsg',x.message||'Не удалось войти. Проверьте настройки сессии Worker.','error')}finally{btn.disabled=false}};
 $('#setupForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/setup',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});msg('#setupMsg','Администратор создан. Теперь войдите.','success');showLogin()}catch(x){msg('#setupMsg',x.message,'error')}};
 $('#recoveryForm').onsubmit=async e=>{e.preventDefault();try{await api('/admin/recover-password',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});e.target.reset();msg('#recoveryMsg','Пароль обновлён. Теперь войдите с новым паролем.','success');showLogin()}catch(x){msg('#recoveryMsg',x.message,'error')}};
 async function logout(){await api('/logout',{method:'POST'});location.reload()}
@@ -118,8 +118,8 @@ async function loadEmployees(){
  const q=$('#employeeSearch').value.trim(),params=new URLSearchParams();
  if(q)params.set('q',q);if(employeeFilter==='slingers')params.set('slingers','1');
  try{const d=await api('/employees?'+params.toString());$('#employeeCount').textContent='Найдено работников: '+d.total;
-  $('#employeeList').innerHTML=d.employees.map(e=>'<div class="item"><b>'+esc(e.employee_name)+'</b><div class="muted">'+esc(e.position||'Должность не указана')+' · '+esc(e.employer||'Организация не указана')+'</div><div class="muted">Вводный инструктаж: '+esc(e.instruction_date||'—')+' · О-86: '+esc(e.form_o86_value||'—')+' · 086: '+esc(e.form_086_value||'—')+' · Стропальщик: '+esc(e.slinger_certificate||'—')+'</div>'+slingerExpiryHtml(e)+'</div>').join('')||'<p class="muted">Работники не найдены. Администратор может загрузить Excel-файл.</p>'
- catch(e){$('#employeeCount').textContent=e.message}
+  $('#employeeList').innerHTML=d.employees.map(e=>'<div class="item"><b>'+esc(e.employee_name)+'</b><div class="muted">'+esc(e.position||'Должность не указана')+' · '+esc(e.employer||'Организация не указана')+'</div><div class="muted">Вводный инструктаж: '+esc(e.instruction_date||'—')+' · О-86: '+esc(e.form_o86_value||'—')+' · 086: '+esc(e.form_086_value||'—')+' · Стропальщик: '+esc(e.slinger_certificate||'—')+'</div>'+slingerExpiryHtml(e)+'</div>').join('')||'<p class="muted">Работники не найдены. Администратор может загрузить Excel-файл.</p>';}
+ catch(e){$('#employeeCount').textContent='Ошибка: '+e.message;$('#employeeList').innerHTML='<p class="error">'+esc(e.message)+'</p>'}
 }
 async function uploadEmployees(){
  const file=$('#employeeExcel').files[0];if(!file)return alert('Выберите Excel-файл.');
@@ -139,7 +139,7 @@ async function uploadEmployees(){
 
 async function loadAll(){try{await Promise.all([loadTasks(),loadChecklist(),loadDocs(),loadAdmin()])}catch(e){console.error(e)}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-async function init(){try{const d=await api('/me');me=d.user;showApp()}catch{showLogin()}}
-init();
+async function init(){const d=await api('/me');me=d.user;showApp()}
+init().catch(()=>showLogin());
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(err=>console.warn('PWA worker:',err)));}
 </script></body></html>
