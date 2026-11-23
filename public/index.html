@@ -22,7 +22,7 @@ button.secondary{background:#e8efeb;color:#173b32}button.danger{background:#a33b
 .error{color:#a33b36}.success{color:#176b43}.row{display:flex;gap:9px;align-items:center}.row>*{flex:1}
 .counter{background:#fff;border:1px solid #dce5df;color:#173b32;text-align:left;min-height:75px}
 .counter b{font-size:23px;display:block}.counter.active{outline:2px solid #1d604d}
-.overdue{border:2px solid #c43c36;background:#fff8f7}.overdueText{color:#b32620;font-weight:bold}
+.overdue{border:2px solid #c43c36;background:#fff8f7}.overdueText{color:#b32620;font-weight:bold}.cert-expired{border:2px solid #c43c36;background:#fff5f4}.cert-expired .cert-label{color:#b32620;font-weight:bold}.cert-soon{border:2px solid #dc8b27;background:#fffaf1}.cert-soon .cert-label{color:#a65a00;font-weight:bold}.cert-active{border:1px solid #5b9b76;background:#f6fbf7}.cert-active .cert-label{color:#176b43;font-weight:bold}
 .photo{width:100%;max-width:180px;height:130px;object-fit:cover;border-radius:8px;border:1px solid #ddd;margin:5px}
 .videoPlayer{width:100%;max-width:520px;border-radius:8px;background:#111;margin:8px 0}
 .actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{width:auto;flex:1;min-width:130px}
@@ -68,6 +68,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
    <button onclick="tab('tasks')">Задания</button>
    <button onclick="tab('checklist')">Ежедневный обход</button>
    <button onclick="tab('docs')">Документы</button>
+   <button onclick="tab('certificates')">Удостоверения</button>
    <button id="adminTab" class="secondary hidden" onclick="tab('admin')">Администрирование</button>
    <button class="secondary" onclick="logout()">Выйти</button>
   </div>
@@ -102,6 +103,24 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
     <button>Загрузить документ (до 15 МБ)</button>
    </form>
    <div id="docList"></div>
+  </div>
+
+
+  <div id="certificates" class="hidden">
+   <h2>Удостоверения работников</h2>
+   <p class="muted">Статус пересчитывается автоматически по текущей дате: красный — просрочено, оранжевый — осталось 30 дней или меньше, зелёный — действует.</p>
+   <div class="grid" id="certificateCounters"></div>
+   <form id="certificateForm" class="item hidden">
+    <h3 id="certificateFormTitle">Добавить удостоверение</h3>
+    <input name="employeeName" placeholder="ФИО работника" required>
+    <input name="position" placeholder="Должность">
+    <input name="certificateNumber" placeholder="Номер удостоверения">
+    <label>Действительно до</label><input name="validUntil" type="date" required>
+    <input name="id" type="hidden">
+    <div class="actions"><button type="submit">Сохранить</button><button type="button" class="secondary" onclick="resetCertificateForm()">Отмена</button></div>
+   </form>
+   <button id="addCertificateButton" class="secondary hidden" onclick="newCertificate()">Добавить удостоверение</button>
+   <div id="certificateList"></div>
   </div>
 
   <div id="admin" class="hidden">
@@ -147,7 +166,7 @@ async function api(path,opts={}){
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function showLogin(){$('#login').classList.remove('hidden');$('#setup').classList.add('hidden')}
 function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.remove('hidden')}
-function tab(name){['tasks','checklist','docs','admin'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='tasks')loadTasks()}
+function tab(name){['tasks','checklist','docs','certificates','admin'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='tasks')loadTasks();if(name==='certificates')loadCertificates()}
 function showApp(){
  $('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');
  $('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':'Инженер ОТ и ТБ');
@@ -156,6 +175,45 @@ function showApp(){
 }
 function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function isLate(t){return !!t.due_date&&t.due_date<today()&&t.status!=='Выполнено'}
+
+let allCertificates=[],certificateFilter='Все';
+function certificateState(c){
+ const now=new Date();now.setHours(0,0,0,0);
+ const end=new Date(c.valid_until+'T00:00:00');
+ const days=Math.ceil((end-now)/86400000);
+ if(days<0)return {key:'Просрочено',label:'ПРОСРОЧЕНО на '+Math.abs(days)+' дн.',className:'cert-expired'};
+ if(days<=30)return {key:'Истекает',label:'Истекает через '+days+' дн.',className:'cert-soon'};
+ return {key:'Действует',label:'Действует · осталось '+days+' дн.',className:'cert-active'};
+}
+function renderCertificateList(){
+ const counts={'Все':allCertificates.length,'Действует':0,'Истекает':0,'Просрочено':0};
+ allCertificates.forEach(c=>{const s=certificateState(c);if(counts[s.key]!==undefined)counts[s.key]++});
+ $('#certificateCounters').innerHTML=Object.entries(counts).map(([k,v])=>'<button class="counter '+(certificateFilter===k?'active':'')+'" onclick="filterCertificates(\''+k+'\')">'+esc(k)+'<b>'+v+'</b></button>').join('');
+ const list=allCertificates.filter(c=>certificateFilter==='Все'||certificateState(c).key===certificateFilter);
+ $('#certificateList').innerHTML=list.map(c=>{
+  const s=certificateState(c);
+  return '<article class="item certificate '+s.className+'"><div class="row"><b>'+esc(c.employee_name)+'</b><span class="status">'+esc(s.key)+'</span></div><p>'+esc(c.position||'Должность не указана')+'</p><p class="muted">Удостоверение: '+esc(c.certificate_number||'не указан')+'</p><p><b>Действительно до: '+esc(c.valid_until)+'</b></p><p class="cert-label">'+esc(s.label)+'</p>'+(me.role==='admin'?'<button class="secondary" onclick="editCertificate('+c.id+')">Изменить</button>':'')+'</article>';
+ }).join('')||'<p class="muted">В этой категории удостоверений нет.</p>';
+}
+function filterCertificates(f){certificateFilter=f;renderCertificateList()}
+async function loadCertificates(){
+ try{const d=await api('/certificates');allCertificates=d.certificates||[];renderCertificateList();$('#addCertificateButton').classList.toggle('hidden',me.role!=='admin')}
+ catch(e){$('#certificateList').textContent=e.message}
+}
+function newCertificate(){const f=$('#certificateForm');f.reset();f.elements.id.value='';$('#certificateFormTitle').textContent='Добавить удостоверение';f.classList.remove('hidden')}
+function resetCertificateForm(){$('#certificateForm').classList.add('hidden');$('#certificateForm').reset()}
+function editCertificate(id){
+ const c=allCertificates.find(x=>x.id===id);if(!c)return;const f=$('#certificateForm');
+ f.elements.employeeName.value=c.employee_name;f.elements.position.value=c.position||'';f.elements.certificateNumber.value=c.certificate_number||'';
+ f.elements.validUntil.value=c.valid_until;f.elements.id.value=c.id;$('#certificateFormTitle').textContent='Изменить удостоверение';f.classList.remove('hidden');
+}
+$('#certificateForm').onsubmit=async e=>{
+ e.preventDefault();const f=e.target;const id=f.elements.id.value;
+ const body={employeeName:f.elements.employeeName.value,position:f.elements.position.value,certificateNumber:f.elements.certificateNumber.value,validUntil:f.elements.validUntil.value};
+ try{await api(id?'/certificates/'+id:'/certificates',{method:id?'PATCH':'POST',body:JSON.stringify(body)});resetCertificateForm();await loadCertificates()}
+ catch(x){alert(x.message)}
+};
+
 function fmtDate(s){return s?new Date(s.replace(' ','T')+'Z').toLocaleString('ru-RU'):'—'}
 
 $('#loginForm').onsubmit=async e=>{
