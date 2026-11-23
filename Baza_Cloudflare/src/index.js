@@ -109,7 +109,7 @@ async function api(request, env) {
     const slingers=url.searchParams.get("slingers")==="1";
     const state=await env.DB.prepare("SELECT active_batch_id FROM employee_import_state WHERE id=1").first();
     if(!state?.active_batch_id) return json({employees:[],total:0});
-    let sql="SELECT id,employee_name,position,employer,instruction_date,form_o86_value,form_086_value,has_medical_certificate,slinger_certificate,slinger_expiry_date FROM employees WHERE batch_id=?";
+    let sql="SELECT e.id,e.employee_name,e.position,e.employer,e.instruction_date,e.form_o86_value,e.form_086_value,e.has_medical_certificate,e.slinger_certificate,COALESCE((SELECT c.valid_until FROM certificates c WHERE LOWER(TRIM(c.employee_name))=LOWER(TRIM(e.employee_name)) ORDER BY c.valid_until DESC LIMIT 1),e.slinger_expiry_date) AS slinger_expiry_date FROM employees e WHERE e.batch_id=?";
     const args=[state.active_batch_id];
     if(q){sql+=" AND employee_name LIKE ?";args.push("%"+q+"%");}
     if(slingers) sql+=" AND COALESCE(slinger_certificate,'')<>'' AND LOWER(slinger_certificate) NOT IN ('нет','no','-','0')";
@@ -138,6 +138,29 @@ async function api(request, env) {
     }
     return json({ok:true,saved:statements.length,published:b.publish===true});
   }
+  if(path==="/api/certificates" && method==="GET") {
+    const rows=await env.DB.prepare("SELECT id,employee_name,position,certificate_number,valid_until,updated_at FROM certificates ORDER BY valid_until,employee_name").all();
+    return json({certificates:rows.results});
+  }
+  if(path==="/api/certificates" && method==="POST") {
+    if(!adminOnly(user)) return json({error:"Только администратор может добавлять удостоверения"},403);
+    const b=await request.json();
+    if(!String(b.employeeName||"").trim() || !/^\d{4}-\d{2}-\d{2}$/.test(b.validUntil||"")) return json({error:"Укажите ФИО и дату окончания"},400);
+    const r=await env.DB.prepare("INSERT INTO certificates(employee_name,position,certificate_number,valid_until,updated_by) VALUES(?,?,?,?,?)")
+      .bind(String(b.employeeName).trim(),b.position||"",b.certificateNumber||"",b.validUntil,user.id).run();
+    return json({ok:true,id:r.meta.last_row_id});
+  }
+  const certMatch=path.match(/^\/api\/certificates\/(\d+)$/);
+  if(certMatch && method==="PATCH") {
+    if(!adminOnly(user)) return json({error:"Только администратор может изменять удостоверения"},403);
+    const b=await request.json();
+    if(!String(b.employeeName||"").trim() || !/^\d{4}-\d{2}-\d{2}$/.test(b.validUntil||"")) return json({error:"Проверьте ФИО и дату окончания"},400);
+    const r=await env.DB.prepare("UPDATE certificates SET employee_name=?,position=?,certificate_number=?,valid_until=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+      .bind(String(b.employeeName).trim(),b.position||"",b.certificateNumber||"",b.validUntil,user.id,Number(certMatch[1])).run();
+    if(!r.meta.changes) return json({error:"Удостоверение не найдено"},404);
+    return json({ok:true});
+  }
+
   if(path==="/api/users" && method==="GET") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const rows=await env.DB.prepare("SELECT id,username,full_name,role,active FROM users ORDER BY full_name").all();
