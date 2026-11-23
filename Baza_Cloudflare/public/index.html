@@ -117,9 +117,9 @@ function parseEmployeeWorkbook(wb){
 async function loadEmployees(){
  const q=$('#employeeSearch').value.trim(),params=new URLSearchParams();
  if(q)params.set('q',q);params.set('slingers','1');
- try{const d=await api('/employees?'+params.toString());$('#employeeCount').textContent='Найдено работников: '+d.total;
+ try{const d=await api('/employees?'+params.toString());$('#employeeCount').textContent='Найдено работников: 0';
   $('#employeeList').innerHTML=d.employees.map(e=>'<div class="item"><b>'+esc(e.employee_name)+'</b><div class="muted">'+esc(e.position||'Должность не указана')+' · '+esc(e.employer||'Организация не указана')+'</div><div class="muted">Вводный инструктаж: '+esc(e.instruction_date||'—')+' · О-86: '+esc(e.form_o86_value||'—')+' · 086: '+esc(e.form_086_value||'—')+' · Стропальщик: '+esc(e.slinger_certificate||'—')+'</div>'+slingerExpiryHtml(e)+'</div>').join('')||'<p class="muted">Работники не найдены. Администратор может загрузить Excel-файл.</p>';}
- catch(e){$('#employeeCount').textContent='Ошибка: '+e.message;$('#employeeList').innerHTML='<p class="error">'+esc(e.message)+'</p>'}
+ catch(e){$('#employeeCount').textContent='Найдено работников: 0';$('#employeeList').innerHTML='<p class="error">'+esc(e.message)+'</p>'}
 }
 async function uploadEmployees(){
  const file=$('#employeeExcel').files[0];if(!file)return alert('Выберите Excel-файл.');
