@@ -114,7 +114,7 @@ async function api(request, env) {
     if(q){sql+=" AND LOWER(e.employee_name) LIKE LOWER(?)";args.push("%"+q+"%");}
     const slingerPosition="LOWER(TRIM(COALESCE(e.position,''))) LIKE '%стропальщик%'";
     if(slingers) sql+=" AND "+slingerPosition;
-    else if(!q) sql+=" AND NOT ("+slingerPosition+")";
+    else sql+=" AND NOT ("+slingerPosition+")";
     sql+=" ORDER BY employee_name LIMIT 1000";
     const rows=await env.DB.prepare(sql).bind(...args).all();
     return json({employees:rows.results,total:rows.results.length});
