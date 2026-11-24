@@ -120,14 +120,14 @@ function parseSlingerWorkbook(wb,dateCol){
  for(const sh of sheets){
   for(let i=0;i<Math.min(sh.rows.length,20);i++){
    const hs=sh.rows[i].map(v=>String(v??'').trim()),joined=hs.map(normExcel).join(' ');
-   if(joined.includes('фио')&&joined.includes('удостовер')){
+   if((joined.includes('ф.и.о')||joined.includes('фио'))&&joined.includes('удостовер')){
     preferred=sh;hi=i;headers=hs;break;
    }
   }
   if(preferred)break;
  }
  if(!preferred)throw Error('Не найдены заголовки ФИО и номера удостоверения. Проверьте Excel-файл.');
- const ni=headerIndexExcel(headers,['фио']),ci=headerIndexExcel(headers,['номер удостоверения']);
+ const ni=headerIndexExcel(headers,['ф.и.о','фио']),ci=headerIndexExcel(headers,['номер удостоверения']);
  if(ni<0)throw Error('Не найдена колонка ФИО.');
  if(ci<0)throw Error('Не найдена колонка «Номер удостоверения».');
  const out=[];
