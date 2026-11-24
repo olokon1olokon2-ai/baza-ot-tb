@@ -149,22 +149,22 @@ async function api(request, env) {
       const name=String(r.employee_name||"").trim();
       if(!name) continue;
       const expiry=String(r.slinger_expiry_date||"").trim();
-      if(expiry && !/^\\d{4}-\\d{2}-\\d{2}$/.test(expiry)) return json({error:"Неверный формат даты окончания у "+name},400);
-      unique.set(name.toLowerCase().replace(/\\s+/g," "),{name,certificate:String(r.slinger_certificate||"").trim(),expiry:expiry||null});
+      if(expiry && !/^\d{4}-\d{2}-\d{2}$/.test(expiry)) return json({error:"Неверный формат даты окончания у "+name},400);
+      unique.set(name.toLowerCase().replace(/\s+/g," "),{name,certificate:String(r.slinger_certificate||"").trim(),expiry:expiry||null});
     }
     const statements=[];
     let updated=0,added=0;
     for(const [key,r] of unique) {
       const existing=await env.DB.prepare("SELECT id FROM employees WHERE batch_id=? AND lower(trim(employee_name))=lower(trim(?)) ORDER BY id LIMIT 1").bind(state.active_batch_id,r.name).first();
       if(existing) {
-        statements.push(env.DB.prepare("UPDATE employees SET slinger_certificate=?,slinger_expiry_date=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(r.certificate||null,r.expiry,existing.id));
+        statements.push(env.DB.prepare("UPDATE employees SET slinger_certificate=?,slinger_expiry_date=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(r.certificate||"не указан",r.expiry,existing.id));
         updated++;
       } else {
         const sourceKey="slinger-upload:"+key;
         statements.push(env.DB.prepare(`INSERT INTO employees(batch_id,source_key,employee_name,position,slinger_certificate,slinger_expiry_date)
           VALUES(?,?,?,'Стропальщик',?,?)
           ON CONFLICT(batch_id,source_key) DO UPDATE SET employee_name=excluded.employee_name,slinger_certificate=excluded.slinger_certificate,slinger_expiry_date=excluded.slinger_expiry_date,updated_at=CURRENT_TIMESTAMP`)
-          .bind(state.active_batch_id,sourceKey,r.name,r.certificate||null,r.expiry));
+          .bind(state.active_batch_id,sourceKey,r.name,r.certificate||"не указан",r.expiry));
         added++;
       }
     }
