@@ -111,8 +111,10 @@ async function api(request, env) {
     if(!state?.active_batch_id) return json({employees:[],total:0});
     let sql="SELECT e.id,e.employee_name,e.position,e.employer,e.instruction_date,e.form_o86_value,e.form_086_value,e.has_medical_certificate,e.slinger_certificate,e.slinger_expiry_date FROM employees e WHERE e.batch_id=?";
     const args=[state.active_batch_id];
-    if(q){sql+=" AND employee_name LIKE ?";args.push("%"+q+"%");}
-    if(slingers) sql+=" AND COALESCE(slinger_certificate,'')<>'' AND LOWER(slinger_certificate) NOT IN ('нет','no','-','0')";
+    if(q){sql+=" AND LOWER(e.employee_name) LIKE LOWER(?)";args.push("%"+q+"%");}
+    const slingerPosition="LOWER(TRIM(COALESCE(e.position,''))) LIKE '%стропальщик%'";
+    if(slingers) sql+=" AND "+slingerPosition;
+    else if(!q) sql+=" AND NOT ("+slingerPosition+")";
     sql+=" ORDER BY employee_name LIMIT 1000";
     const rows=await env.DB.prepare(sql).bind(...args).all();
     return json({employees:rows.results,total:rows.results.length});
@@ -157,7 +159,7 @@ async function api(request, env) {
     for(const [key,r] of unique) {
       const existing=await env.DB.prepare("SELECT id FROM employees WHERE batch_id=? AND lower(trim(employee_name))=lower(trim(?)) ORDER BY id LIMIT 1").bind(state.active_batch_id,r.name).first();
       if(existing) {
-        statements.push(env.DB.prepare("UPDATE employees SET slinger_certificate=?,slinger_expiry_date=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(r.certificate||"не указан",r.expiry,existing.id));
+        statements.push(env.DB.prepare("UPDATE employees SET position='Стропальщик',slinger_certificate=?,slinger_expiry_date=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(r.certificate||"не указан",r.expiry,existing.id));
         updated++;
       } else {
         const sourceKey="slinger-upload:"+key;
