@@ -245,9 +245,10 @@ async function api(request, env) {
       LEFT JOIN users u ON u.id=t.assigned_to
       JOIN users c ON c.id=t.created_by
       LEFT JOIN users r ON r.id=t.reviewed_by
-      WHERE (?='admin' OR t.organization_id IS ? OR t.assigned_to=? OR t.created_by=?)
+      WHERE (?='admin' OR (?='responsible' AND t.assigned_to=?) OR
+        (?<>'responsible' AND (t.organization_id IS ? OR t.assigned_to=? OR t.created_by=?)))
       ORDER BY CASE WHEN t.status='Выполнено' THEN 1 ELSE 0 END,t.due_date
-    `).bind(user.role, user.organization_id, user.id, user.id).all();
+    `).bind(user.role, user.role, user.id, user.role, user.organization_id, user.id, user.id).all();
     return json({ tasks: rows.results });
   }
 
