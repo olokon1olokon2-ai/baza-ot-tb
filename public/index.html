@@ -112,6 +112,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
   <div id="photoreports" class="hidden">
    <h2>Фотоотчёты</h2>
    <p class="muted">Два ответственных инженера отправляют фотографии администратору. Администратор проверяет и подтверждает либо отклоняет отчёт.</p>
+   <p id="photoReportPermissionNotice" class="muted hidden">Администратор ещё не выдал вам специальное право на отправку фотоотчётов. Обратитесь к администратору.</p>
    <form id="photoReportForm" class="item">
     <h3>Отправить фотографию администратору</h3>
     <label>Фотография с телефона или из галереи</label>
@@ -197,7 +198,9 @@ function showApp(){
  $('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');
  $('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':'Инженер ОТ и ТБ');
  $('#adminTab').classList.toggle('hidden',me.role!=='admin');
- $('#photoReportForm').classList.toggle('hidden',me.role!=='engineer');
+ const canSendPhotoReports=me.role==='engineer'&&Number(me.can_submit_photo_reports)===1;
+ $('#photoReportForm').classList.toggle('hidden',!canSendPhotoReports);
+ $('#photoReportPermissionNotice').classList.toggle('hidden',me.role!=='engineer'||canSendPhotoReports);
  tab('tasks');loadAll();
 }
 function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -504,10 +507,25 @@ $('#checkItemForm').onsubmit=async e=>{
 
 function renderAdminUsers(){
  const q=searchNorm($('#userSearch')?.value);
- const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён'));
- $('#userList').innerHTML=users.map(x=>`<div class="item">${esc(x.full_name)} · ${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</div>`).join('')||'<p class="muted">Совпадений нет.</p>';
+ const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён',Number(x.can_submit_photo_reports)===1?'право на фотоотчёты':'без права на фотоотчёты'));
+ $('#userList').innerHTML=users.map(x=>{
+  const canSend=Number(x.can_submit_photo_reports)===1;
+  const permissionControl=x.role==='engineer'
+   ? `<p class="muted">Право на фотоотчёты: <b class="${canSend?'success':'error'}">${canSend?'выдано':'не выдано'}</b></p><button class="secondary" onclick="togglePhotoReportPermission(${Number(x.id)},${canSend})">${canSend?'Снять право':'Дать право на фотоотчёты'}</button>`
+   : '';
+  return `<div class="item"><b>${esc(x.full_name)}</b><p class="muted">${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</p>${permissionControl}</div>`;
+ }).join('')||'<p class="muted">Совпадений нет.</p>';
 }
 $('#userSearch').addEventListener('input',renderAdminUsers);
+async function togglePhotoReportPermission(id,currentValue){
+ const enabled=!currentValue;
+ const action=enabled?'дать право на отправку фотоотчётов':'снять право на отправку фотоотчётов';
+ if(!confirm('Вы действительно хотите '+action+' этому инженеру?'))return;
+ try{
+  await api('/users/'+id+'/photo-report-permission',{method:'PATCH',body:JSON.stringify({enabled})});
+  await loadAdmin();
+ }catch(e){alert(e.message)}
+}
 async function loadAdmin(){
  if(me.role!=='admin')return;
  try{
