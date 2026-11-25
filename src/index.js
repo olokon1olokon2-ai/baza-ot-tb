@@ -609,9 +609,7 @@ async function api(request, env) {
       return json({ ok: true });
     }
     if (body.action === "reject") {
-      const reason = String(body.comment || "").trim();
-      if (!reason) return json({ error: "Укажите причину отклонения" }, 400);
-      await env.DB.prepare("UPDATE photo_reports SET status='Отклонено',reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP,review_comment=? WHERE id=?").bind(user.id,reason,id).run();
+      await env.DB.prepare("UPDATE photo_reports SET status='Отклонено',reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP,review_comment='' WHERE id=?").bind(user.id,id).run();
       return json({ ok: true });
     }
     return json({ error: "Неизвестное действие" }, 400);
