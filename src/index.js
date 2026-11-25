@@ -179,6 +179,10 @@ async function api(request, env) {
   if (path === "/api/users" && method === "POST") {
     if (!adminOnly(user)) return json({ error: "Недостаточно прав" }, 403);
     const b = await request.json();
+    if (b.role !== "admin") {
+      const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE role='engineer' AND active=1").first();
+      if ((count?.n || 0) >= 2) return json({ error: "Можно создать только двух активных ответственных инженеров" }, 400);
+    }
     if (!b.username || !b.fullName || !b.password || b.password.length < 12) {
       return json({ error: "Заполните ФИО, логин и пароль от 12 символов" }, 400);
     }
