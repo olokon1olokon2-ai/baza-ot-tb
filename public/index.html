@@ -68,7 +68,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
    <button onclick="tab('tasks')">Задания</button>
    <button onclick="tab('checklist')">Ежедневный обход</button>
    <button onclick="tab('docs')">Документы</button>
-   <button onclick="tab('photoreports')">Фотоотчёты</button>
+   <button onclick="tab('photoreports')">Фото</button>
    <button onclick="tab('certificates')">Удостоверения</button>
    <button id="adminTab" class="secondary hidden" onclick="tab('admin')">Администрирование</button>
    <button class="secondary" onclick="logout()">Выйти</button>
@@ -110,9 +110,9 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
   </div>
 
   <div id="photoreports" class="hidden">
-   <h2>Фотоотчёты</h2>
-   <p class="muted">Фотоотчёты отправляют только инженеры, которым администратор выдал специальное право. Администратор проверяет и подтверждает либо отклоняет отчёт.</p>
-   <p id="photoReportPermissionNotice" class="muted hidden">Администратор ещё не выдал вам специальное право на отправку фотоотчётов. Обратитесь к администратору.</p>
+   <h2>Фото</h2>
+   <p class="muted">Фотографии отправляют только инженеры, которым администратор выдал специальное право. Администратор проверяет и подтверждает либо отклоняет их.</p>
+   <p id="photoReportPermissionNotice" class="muted hidden">Администратор ещё не выдал вам специальное право на отправку фото. Обратитесь к администратору.</p>
    <form id="photoReportForm" class="item">
     <h3>Отправить фотографию администратору</h3>
     <label>Фотография с телефона или из галереи</label>
@@ -120,8 +120,8 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
     <textarea name="description" placeholder="Опишите объект, место и что изображено на фото" required></textarea>
     <button>Отправить на проверку</button>
    </form>
-   <div class="row"><h3>Фотоотчёты</h3><button class="secondary" style="max-width:150px" onclick="loadPhotoReports()">Обновить</button></div>
-   <input id="photoReportSearch" type="search" placeholder="Поиск фотоотчётов: инженер, организация, описание, статус">
+   <div class="row"><h3>Фото</h3><button class="secondary" style="max-width:150px" onclick="loadPhotoReports()">Обновить</button></div>
+   <input id="photoReportSearch" type="search" placeholder="Поиск фото: инженер, организация, описание, статус">
    <div id="photoReportList"></div>
   </div>
 
@@ -435,10 +435,10 @@ async function saveCheck(id){
 }
 $('#checkDate').value=today();$('#checkDate').onchange=loadChecklist;
 
-// Фотоотчёты инженеров: отправка и проверка администратором
+// Фото инженеров: отправка и проверка администратором
 $('#photoReportForm').onsubmit=async e=>{
  e.preventDefault();
- try{await api('/photo-reports',{method:'POST',body:new FormData(e.target)});e.target.reset();alert('Фотоотчёт отправлен администратору на проверку');await loadPhotoReports()}
+ try{await api('/photo-reports',{method:'POST',body:new FormData(e.target)});e.target.reset();alert('Фото отправлено администратору на проверку');await loadPhotoReports()}
  catch(x){alert(x.message)}
 };
 
@@ -451,7 +451,7 @@ function renderPhotoReports(){
   const review=me.role==='admin'&&p.status==='На проверке';
   return `<article class="item"><div class="row"><b>${esc(p.engineer_name)}</b><span class="status ${cls}">${esc(p.status)}</span></div>`+
    `<p>${esc(p.description)}</p><p class="muted">${esc(p.organization_name||'Без организации')} · ${esc(fmtDate(p.created_at))}</p>`+
-   `<a href="/api/photo-reports/${p.id}/file" target="_blank"><img class="photo" src="/api/photo-reports/${p.id}/file" alt="Фотоотчёт"></a>`+
+   `<a href="/api/photo-reports/${p.id}/file" target="_blank"><img class="photo" src="/api/photo-reports/${p.id}/file" alt="Фото"></a>`+
    (p.reviewer_name?`<p class="muted">Проверил: ${esc(p.reviewer_name)} · ${esc(fmtDate(p.reviewed_at))}</p>`:'')+
    (review?`<div class="actions"><button onclick="reviewPhotoReport(${p.id},'approve')">Подтвердить</button><button class="danger" onclick="reviewPhotoReport(${p.id},'reject')">Отклонить</button></div>`:'')+
    (me.role==='admin'?`<button class="danger" onclick="deletePhotoReport(${p.id})">Удалить из базы</button>`:'')+
@@ -466,11 +466,11 @@ async function loadPhotoReports(){
 }
 
 async function reviewPhotoReport(id,action){
- if(!confirm(action==='approve'?'Подтвердить этот фотоотчёт?':'Отклонить этот фотоотчёт?'))return;
+ if(!confirm(action==='approve'?'Подтвердить эту фотографию?':'Отклонить эту фотографию?'))return;
  try{await api('/photo-reports/'+id,{method:'PATCH',body:JSON.stringify({action})});await loadPhotoReports()}catch(e){alert(e.message)}
 }
 async function deletePhotoReport(id){
- if(!confirm('Удалить фотоотчёт, запись и сам файл без возможности восстановления?'))return;
+ if(!confirm('Удалить фотографию, запись и сам файл без возможности восстановления?'))return;
  try{await api('/photo-reports/'+id,{method:'DELETE'});await loadPhotoReports()}catch(e){alert(e.message)}
 }
 // Документы
@@ -508,11 +508,11 @@ $('#checkItemForm').onsubmit=async e=>{
 
 function renderAdminUsers(){
  const q=searchNorm($('#userSearch')?.value);
- const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён',Number(x.can_submit_photo_reports)===1?'право на фотоотчёты':'без права на фотоотчёты'));
+ const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён',Number(x.can_submit_photo_reports)===1?'право на фото':'без права на фотоотчёты'));
  $('#userList').innerHTML=users.map(x=>{
   const canSend=Number(x.can_submit_photo_reports)===1;
   const permissionControl=x.role==='engineer'
-   ? `<p class="muted">Право на фотоотчёты: <b class="${canSend?'success':'error'}">${canSend?'выдано':'не выдано'}</b></p><button class="secondary" onclick="togglePhotoReportPermission(${Number(x.id)},${canSend})">${canSend?'Снять право':'Дать право на фотоотчёты'}</button>`
+   ? `<p class="muted">Право на фото: <b class="${canSend?'success':'error'}">${canSend?'выдано':'не выдано'}</b></p><button class="secondary" onclick="togglePhotoReportPermission(${Number(x.id)},${canSend})">${canSend?'Снять право':'Дать право на фото'}</button>`
    : '';
   return `<div class="item"><b>${esc(x.full_name)}</b><p class="muted">${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</p>${permissionControl}</div>`;
  }).join('')||'<p class="muted">Совпадений нет.</p>';
@@ -520,7 +520,7 @@ function renderAdminUsers(){
 $('#userSearch').addEventListener('input',renderAdminUsers);
 async function togglePhotoReportPermission(id,currentValue){
  const enabled=!currentValue;
- const action=enabled?'дать право на отправку фотоотчётов':'снять право на отправку фотоотчётов';
+ const action=enabled?'дать право на отправку фото':'снять право на отправку фото';
  if(!confirm('Вы действительно хотите '+action+' этому инженеру?'))return;
  try{
   await api('/users/'+id+'/photo-report-permission',{method:'PATCH',body:JSON.stringify({enabled})});
