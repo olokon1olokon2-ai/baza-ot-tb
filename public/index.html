@@ -508,7 +508,7 @@ $('#checkItemForm').onsubmit=async e=>{
 
 function renderAdminUsers(){
  const q=searchNorm($('#userSearch')?.value);
- const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён',Number(x.can_submit_photo_reports)===1?'право на фото':'без права на фотоотчёты'));
+ const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён',Number(x.can_submit_photo_reports)===1?'право на фото':'без права на фото'));
  $('#userList').innerHTML=users.map(x=>{
   const canSend=Number(x.can_submit_photo_reports)===1;
   const permissionControl=x.role==='engineer'
