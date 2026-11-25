@@ -298,6 +298,7 @@ function renderTaskList(){
   const late=isLate(t);
   // Все инженеры могут загружать фото до и после устранения в заданиях своей организации.
   const worker=me.role==='admin'||me.role==='engineer'||(me.role==='responsible'&&Number(t.assigned_to)===Number(me.id));
+  const videoWorker=me.role==='admin'||me.role==='engineer';
   const reviewer=me.role==='admin';
   return `<article class="item ${late?'overdue':''}">
    <div class="row"><b>${esc(t.title)}</b><span class="status">${esc(t.status)}</span></div>
@@ -324,7 +325,7 @@ function renderTaskList(){
    <div class="item">
     <b>Видеоотчёт</b>
     <div id="videos${t.id}" class="muted">Загрузка видео…</div>
-    ${worker&&t.status!=='Выполнено'?`
+    ${videoWorker&&t.status!=='Выполнено'?`
      <label>Добавить видео (до 50 МБ)</label>
      <input type="file" accept="video/*" id="video${t.id}">
      <button class="secondary" onclick="uploadVideo(${t.id})">Загрузить видеоотчёт</button>`:''}
