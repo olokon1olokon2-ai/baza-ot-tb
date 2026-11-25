@@ -66,10 +66,10 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
  <div class="panel">
   <div class="tabs">
    <button onclick="tab('tasks')">Задания</button>
-   <button onclick="tab('checklist')">Ежедневный обход</button>
-   <button onclick="tab('docs')">Документы</button>
-   <button onclick="tab('photoreports')">Фото</button>
-   <button onclick="tab('certificates')">Удостоверения</button>
+   <button id="checklistTab" onclick="tab('checklist')">Ежедневный обход</button>
+   <button id="docsTab" onclick="tab('docs')">Документы</button>
+   <button id="photoReportTab" onclick="tab('photoreports')">Фото</button>
+   <button id="certificatesTab" onclick="tab('certificates')">Удостоверения</button>
    <button id="adminTab" class="secondary hidden" onclick="tab('admin')">Администрирование</button>
    <button class="secondary" onclick="logout()">Выйти</button>
   </div>
@@ -111,7 +111,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
 
   <div id="photoreports" class="hidden">
    <h2>Фото</h2>
-   <p class="muted">Фотографии отправляют только инженеры, которым администратор выдал специальное право. Администратор проверяет и подтверждает либо отклоняет их.</p>
+   <p class="muted">Раздел «Фото» отдельный. Отправлять фотографии могут только инженеры ОТ и ТБ, которым администратор выдал специальное право. Администратор проверяет и подтверждает либо отклоняет их.</p>
    <p id="photoReportPermissionNotice" class="muted hidden">Администратор ещё не выдал вам специальное право на отправку фото. Обратитесь к администратору.</p>
    <form id="photoReportForm" class="item">
     <h3>Отправить фотографию администратору</h3>
@@ -154,11 +154,11 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
    <div id="orgList"></div>
    <h3>Пользователи</h3>
    <form id="userForm">
-    <input name="fullName" placeholder="ФИО инженера" required>
+    <input name="fullName" placeholder="ФИО сотрудника" required>
     <input name="username" placeholder="Логин" required>
     <input name="password" type="password" minlength="12" placeholder="Пароль от 12 символов" required>
     <select name="organizationId" id="orgSelect"><option value="">Без организации</option></select>
-    <select name="role"><option value="engineer">Инженер ОТ и ТБ</option><option value="admin">Администратор</option></select>
+    <select name="role"><option value="admin">Администратор</option><option value="responsible">Ответственный сотрудник</option><option value="engineer">Инженер ОТ и ТБ</option></select>
     <button>Создать пользователя</button>
    </form>
    <input id="userSearch" type="search" placeholder="Поиск пользователей: ФИО, логин, роль">
@@ -196,11 +196,18 @@ function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.r
 function tab(name){['tasks','checklist','docs','photoreports','certificates','admin'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='tasks')loadTasks();if(name==='certificates')loadCertificates();if(name==='photoreports')loadPhotoReports()}
 function showApp(){
  $('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');
- $('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':'Инженер ОТ и ТБ');
+ const roleNames={admin:'Администратор',responsible:'Ответственный сотрудник',engineer:'Инженер ОТ и ТБ'};
+ $('#who').textContent=me.full_name+' · '+(roleNames[me.role]||'Пользователь');
  $('#adminTab').classList.toggle('hidden',me.role!=='admin');
- const canSendPhotoReports=me.role==='engineer'&&Number(me.can_submit_photo_reports)===1;
+ const isEngineer=me.role==='engineer', isResponsible=me.role==='responsible';
+ const canSendPhotoReports=isEngineer&&Number(me.can_submit_photo_reports)===1;
+ $('#photoReportTab').classList.toggle('hidden',isResponsible);
+ $('#checklistTab').classList.toggle('hidden',isResponsible);
+ $('#docsTab').classList.toggle('hidden',isResponsible);
+ $('#certificatesTab').classList.toggle('hidden',isResponsible);
+ $('#taskForm').classList.toggle('hidden',isResponsible);
  $('#photoReportForm').classList.toggle('hidden',!canSendPhotoReports);
- $('#photoReportPermissionNotice').classList.toggle('hidden',me.role!=='engineer'||canSendPhotoReports);
+ $('#photoReportPermissionNotice').classList.toggle('hidden',!isEngineer||canSendPhotoReports);
  tab('tasks');loadAll();
 }
 function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -290,7 +297,7 @@ function renderTaskList(){
  $('#taskList').innerHTML=list.map(t=>{
   const late=isLate(t);
   // Все инженеры могут загружать фото до и после устранения в заданиях своей организации.
-  const worker=me.role==='admin'||me.role==='engineer';
+  const worker=me.role==='admin'||me.role==='engineer'||(me.role==='responsible'&&Number(t.assigned_to)===Number(me.id));
   const reviewer=me.role==='admin';
   return `<article class="item ${late?'overdue':''}">
    <div class="row"><b>${esc(t.title)}</b><span class="status">${esc(t.status)}</span></div>
