@@ -289,7 +289,8 @@ function renderTaskList(){
  const list=allTasks.filter(t=>(taskFilter==='Все'||(taskFilter==='Просрочено'?isLate(t):t.status===taskFilter))&&matchesSearch(query,t.title,t.description,t.status,t.assigned_name,t.creator_name,t.due_date));
  $('#taskList').innerHTML=list.map(t=>{
   const late=isLate(t);
-  const worker=me.role==='admin'||t.assigned_to===me.id||t.created_by===me.id;
+  // Все инженеры могут загружать фото до и после устранения в заданиях своей организации.
+  const worker=me.role==='admin'||me.role==='engineer';
   const reviewer=me.role==='admin';
   return `<article class="item ${late?'overdue':''}">
    <div class="row"><b>${esc(t.title)}</b><span class="status">${esc(t.status)}</span></div>
