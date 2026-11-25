@@ -68,9 +68,8 @@ async function getTask(id, user, env) {
   if (!task) return { error: json({ error: "Задание не найдено" }, 404) };
 
   const allowed = user.role === "admin" ||
-    task.organization_id === user.organization_id ||
-    task.assigned_to === user.id ||
-    task.created_by === user.id;
+    (user.role === "responsible" ? task.assigned_to === user.id :
+      task.organization_id === user.organization_id || task.assigned_to === user.id || task.created_by === user.id);
 
   if (!allowed) return { error: json({ error: "Нет доступа к заданию" }, 403) };
   return { task };
