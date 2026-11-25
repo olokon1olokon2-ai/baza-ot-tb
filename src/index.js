@@ -211,7 +211,9 @@ async function api(request, env) {
   if (path === "/api/users" && method === "POST") {
     if (!adminOnly(user)) return json({ error: "Недостаточно прав" }, 403);
     const b = await request.json();
-    if (b.role !== "admin") {
+    const allowedRoles = ["admin", "engineer", "responsible"];
+    if (!allowedRoles.includes(b.role)) return json({ error: "Выберите одну из трёх ролей" }, 400);
+    if (b.role === "engineer") {
       const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE role='engineer' AND active=1").first();
       if ((count?.n || 0) >= 2) return json({ error: "Можно создать только двух активных ответственных инженеров" }, 400);
     }
@@ -224,7 +226,7 @@ async function api(request, env) {
       const r = await env.DB.prepare(`
         INSERT INTO users(username,full_name,password_hash,role,organization_id)
         VALUES(?,?,?,?,?)
-      `).bind(b.username, b.fullName, hash, b.role === "admin" ? "admin" : "engineer",
+      `).bind(b.username, b.fullName, hash, b.role,
         b.organizationId || null).run();
       await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)")
         .bind(user.id, r.meta.last_row_id, "Создан пользователь").run();
@@ -251,6 +253,7 @@ async function api(request, env) {
 
   // Создание задания
   if (path === "/api/tasks" && method === "POST") {
+    if (user.role === "responsible") return json({ error: "Создавать задания могут только администратор и инженеры ОТ и ТБ" }, 403);
     const b = await request.json();
     if (!b.title?.trim()) return json({ error: "Введите название задания" }, 400);
 
@@ -294,7 +297,8 @@ async function api(request, env) {
     if (method === "POST") {
       const task = access.task;
       // Фото до и после устранения доступны всем инженерам своей организации.
-      const allowedUploader = user.role === "admin" || user.role === "engineer";
+      const allowedUploader = user.role === "admin" || user.role === "engineer" ||
+        (user.role === "responsible" && task.assigned_to === user.id);
       if (!allowedUploader) return json({ error: "Загружать фото до и после могут только инженеры" }, 403);
 
       const form = await request.formData();
@@ -455,7 +459,7 @@ async function api(request, env) {
     if (access.error) return access.error;
     const task = access.task;
 
-    const isWorker = task.assigned_to === user.id || task.created_by === user.id;
+    const isWorker = task.assigned_to === user.id || (user.role !== "responsible" && task.created_by === user.id);
     const action = body.action;
 
     if (action === "start") {
@@ -517,6 +521,7 @@ async function api(request, env) {
 
   // Ежедневный обход
   if (path === "/api/checklist" && method === "GET") {
+    if (user.role === "responsible") return json({ error: "Нет доступа к ежедневному обходу" }, 403);
     const date = url.searchParams.get("date") || new Date().toISOString().slice(0, 10);
     const rows = await env.DB.prepare(`
       SELECT i.id,i.title,e.result,e.comment FROM checklist_items i
@@ -538,6 +543,7 @@ async function api(request, env) {
   }
 
   if (path === "/api/checklist/entries" && method === "POST") {
+    if (user.role === "responsible") return json({ error: "Отмечать ежедневный обход могут только инженеры ОТ и ТБ" }, 403);
     const b = await request.json();
     if (!b.itemId || !["Выполнено", "Нарушение", "Не применимо"].includes(b.result)) {
       return json({ error: "Проверьте результат обхода" }, 400);
@@ -554,6 +560,7 @@ async function api(request, env) {
 
   // Документы инженера
   if (path === "/api/documents" && method === "GET") {
+    if (user.role === "responsible") return json({ error: "Нет доступа к документам" }, 403);
     const rows = await env.DB.prepare(`
       SELECT id,title,content_type,uploaded_at FROM documents
       WHERE engineer_id=? ORDER BY uploaded_at DESC
@@ -562,6 +569,7 @@ async function api(request, env) {
   }
 
   if (path === "/api/documents" && method === "POST") {
+    if (user.role === "responsible") return json({ error: "Загружать документы могут только инженеры ОТ и ТБ" }, 403);
     const form = await request.formData();
     const file = form.get("file");
     const title = String(form.get("title") || file?.name || "Документ");
@@ -580,6 +588,7 @@ async function api(request, env) {
   }
 
   if (path.startsWith("/api/documents/") && method === "GET") {
+    if (user.role === "responsible") return json({ error: "Нет доступа к документам" }, 403);
     const id = Number(path.split("/").pop());
     const doc = await env.DB.prepare(
       "SELECT * FROM documents WHERE id=? AND engineer_id=?"
@@ -599,6 +608,7 @@ async function api(request, env) {
 
   // Фотоотчёты инженеров с проверкой администратором
   if (path === "/api/photo-reports" && method === "GET") {
+    if (user.role === "responsible") return json({ error: "Нет доступа к разделу Фото" }, 403);
     const sql = `SELECT p.id,p.engineer_id,p.organization_id,p.description,p.status,p.review_comment,p.created_at,p.reviewed_at,u.full_name AS engineer_name,o.name AS organization_name,r.full_name AS reviewer_name FROM photo_reports p JOIN users u ON u.id=p.engineer_id LEFT JOIN organizations o ON o.id=p.organization_id LEFT JOIN users r ON r.id=p.reviewed_by `;
     const rows = user.role === "admin"
       ? await env.DB.prepare(sql + " ORDER BY CASE p.status WHEN 'На проверке' THEN 0 WHEN 'Отклонено' THEN 1 ELSE 2 END,p.created_at DESC").all()
@@ -664,6 +674,7 @@ async function api(request, env) {
   }
   // Certificate register and expiry control
   if (path === "/api/certificates" && method === "GET") {
+    if (user.role === "responsible") return json({ error: "Нет доступа к удостоверениям" }, 403);
     const rows = await env.DB.prepare("SELECT id,employee_name,position,certificate_number,valid_until,updated_at FROM certificates ORDER BY valid_until,employee_name").all();
     return json({ certificates: rows.results });
   }
