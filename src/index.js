@@ -294,9 +294,9 @@ async function api(request, env) {
 
     if (method === "POST") {
       const task = access.task;
-      const allowedUploader = user.role === "admin" ||
-        task.assigned_to === user.id || task.created_by === user.id;
-      if (!allowedUploader) return json({ error: "Нет прав для загрузки фото" }, 403);
+      // Фото до и после устранения доступны всем инженерам своей организации.
+      const allowedUploader = user.role === "admin" || user.role === "engineer";
+      if (!allowedUploader) return json({ error: "Загружать фото до и после могут только инженеры" }, 403);
 
       const form = await request.formData();
       const file = form.get("file");
