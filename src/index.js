@@ -176,6 +176,21 @@ async function api(request, env) {
     return json({ users: rows.results });
   }
 
+  if (path === "/api/access-audit" && method === "GET") {
+    if (!adminOnly(user)) return json({ error: "Недостаточно прав" }, 403);
+    const rows = await env.DB.prepare(`
+      SELECT a.id,a.action,a.created_at,
+        actor.full_name AS actor_name,
+        target.full_name AS target_name,
+        target.username AS target_username
+      FROM access_audit a
+      LEFT JOIN users actor ON actor.id=a.actor_id
+      LEFT JOIN users target ON target.id=a.target_user_id
+      ORDER BY a.id DESC LIMIT 100
+    `).all();
+    return json({ events: rows.results });
+  }
+
   if (path === "/api/users" && method === "POST") {
     if (!adminOnly(user)) return json({ error: "Недостаточно прав" }, 403);
     const b = await request.json();
@@ -194,6 +209,8 @@ async function api(request, env) {
         VALUES(?,?,?,?,?)
       `).bind(b.username, b.fullName, hash, b.role === "admin" ? "admin" : "engineer",
         b.organizationId || null).run();
+      await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)")
+        .bind(user.id, r.meta.last_row_id, "Создан пользователь").run();
       return json({ ok: true, id: r.meta.last_row_id });
     } catch {
       return json({ error: "Логин уже занят" }, 409);
