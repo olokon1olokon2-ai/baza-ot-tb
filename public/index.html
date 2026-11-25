@@ -77,6 +77,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
   <div id="tasks">
    <h2>Задания для устранения</h2>
    <div class="grid" id="counters"></div>
+   <input id="taskSearch" type="search" placeholder="Поиск по заданиям: название, описание, исполнитель">
    <form id="taskForm" class="item">
     <h3>Создать новое задание</h3>
     <input name="title" placeholder="Название задания" required>
@@ -93,6 +94,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
   <div id="checklist" class="hidden">
    <h2>Чек-лист ежедневного обхода</h2>
    <input id="checkDate" type="date">
+   <input id="checkSearch" type="search" placeholder="Поиск по пунктам обхода">
    <div id="checkList"></div>
   </div>
 
@@ -103,6 +105,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
     <input name="file" type="file" required>
     <button>Загрузить документ (до 15 МБ)</button>
    </form>
+   <input id="docSearch" type="search" placeholder="Поиск документов по названию">
    <div id="docList"></div>
   </div>
 
@@ -117,6 +120,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
     <button>Отправить на проверку</button>
    </form>
    <div class="row"><h3>Фотоотчёты</h3><button class="secondary" style="max-width:150px" onclick="loadPhotoReports()">Обновить</button></div>
+   <input id="photoReportSearch" type="search" placeholder="Поиск фотоотчётов: инженер, организация, описание, статус">
    <div id="photoReportList"></div>
   </div>
 
@@ -135,6 +139,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
     <div class="actions"><button type="submit">Сохранить</button><button type="button" class="secondary" onclick="resetCertificateForm()">Отмена</button></div>
    </form>
    <button id="addCertificateButton" class="secondary hidden" onclick="newCertificate()">Добавить удостоверение</button>
+   <input id="certificateSearch" type="search" placeholder="Поиск удостоверений: ФИО, должность, номер">
    <div id="certificateList"></div>
   </div>
 
@@ -155,6 +160,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
     <select name="role"><option value="engineer">Инженер ОТ и ТБ</option><option value="admin">Администратор</option></select>
     <button>Создать пользователя</button>
    </form>
+   <input id="userSearch" type="search" placeholder="Поиск пользователей: ФИО, логин, роль">
    <div id="userList"></div>
    <h3>История действий с доступом</h3>
    <div id="accessAudit" class="muted">Загрузка истории…</div>
@@ -172,6 +178,7 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
 <script>
 const $=s=>document.querySelector(s);
 let me=null,allTasks=[],taskFilter='Все';
+let allChecklistItems=[],allPhotoReports=[],allDocuments=[],allUsers=[];
 
 async function api(path,opts={}){
  const headers=opts.body instanceof FormData? (opts.headers||{}):{'content-type':'application/json',...(opts.headers||{})};
@@ -181,6 +188,8 @@ async function api(path,opts={}){
  return d;
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function searchNorm(s){return String(s??'').normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/ё/g,'е').trim()}
+function matchesSearch(query,...values){return !query||values.some(v=>searchNorm(v).includes(query))}
 function showLogin(){$('#login').classList.remove('hidden');$('#setup').classList.add('hidden')}
 function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.remove('hidden')}
 function tab(name){['tasks','checklist','docs','photoreports','certificates','admin'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='tasks')loadTasks();if(name==='certificates')loadCertificates();if(name==='photoreports')loadPhotoReports()}
@@ -207,13 +216,15 @@ function renderCertificateList(){
  const counts={'Все':allCertificates.length,'Действует':0,'Истекает':0,'Просрочено':0};
  allCertificates.forEach(c=>{const s=certificateState(c);if(counts[s.key]!==undefined)counts[s.key]++});
  $('#certificateCounters').innerHTML=Object.entries(counts).map(([k,v])=>'<button class="counter '+(certificateFilter===k?'active':'')+'" onclick="filterCertificates(\''+k+'\')">'+esc(k)+'<b>'+v+'</b></button>').join('');
- const list=allCertificates.filter(c=>certificateFilter==='Все'||certificateState(c).key===certificateFilter);
+ const query=searchNorm($('#certificateSearch')?.value);
+ const list=allCertificates.filter(c=>(certificateFilter==='Все'||certificateState(c).key===certificateFilter)&&matchesSearch(query,c.employee_name,c.position,c.certificate_number,c.valid_until,certificateState(c).key));
  $('#certificateList').innerHTML=list.map(c=>{
   const s=certificateState(c);
   return '<article class="item certificate '+s.className+'"><div class="row"><b>'+esc(c.employee_name)+'</b><span class="status">'+esc(s.key)+'</span></div><p>'+esc(c.position||'Должность не указана')+'</p><p class="muted">Удостоверение: '+esc(c.certificate_number||'не указан')+'</p><p><b>Действительно до: '+esc(c.valid_until)+'</b></p><p class="cert-label">'+esc(s.label)+'</p>'+(me.role==='admin'?'<button class="secondary" onclick="editCertificate('+c.id+')">Изменить</button>':'')+'</article>';
  }).join('')||'<p class="muted">В этой категории удостоверений нет.</p>';
 }
 function filterCertificates(f){certificateFilter=f;renderCertificateList()}
+$('#certificateSearch').addEventListener('input',renderCertificateList);
 async function loadCertificates(){
  try{const d=await api('/certificates');allCertificates=d.certificates||[];renderCertificateList();$('#addCertificateButton').classList.toggle('hidden',me.role!=='admin')}
  catch(e){$('#certificateList').textContent=e.message}
@@ -267,10 +278,12 @@ function renderCounters(tasks){
  ).join('');
 }
 function filterTasks(f){taskFilter=f;renderTaskList()}
+$('#taskSearch').addEventListener('input',renderTaskList);
 
 function renderTaskList(){
  renderCounters(allTasks);
- const list=allTasks.filter(t=>taskFilter==='Все'||(taskFilter==='Просрочено'?isLate(t):t.status===taskFilter));
+ const query=searchNorm($('#taskSearch')?.value);
+ const list=allTasks.filter(t=>(taskFilter==='Все'||(taskFilter==='Просрочено'?isLate(t):t.status===taskFilter))&&matchesSearch(query,t.title,t.description,t.status,t.assigned_name,t.creator_name,t.due_date));
  $('#taskList').innerHTML=list.map(t=>{
   const late=isLate(t);
   const worker=me.role==='admin'||t.assigned_to===me.id||t.created_by===me.id;
@@ -399,13 +412,17 @@ async function loadHistory(id){
 }
 
 // Ежедневный обход
+function renderChecklist(){
+ const q=searchNorm($('#checkSearch')?.value);
+ const items=allChecklistItems.filter(i=>matchesSearch(q,i.title,i.result,i.comment));
+ $('#checkList').innerHTML=items.map(i=>`<div class="item"><b>${esc(i.title)}</b><select id="c${i.id}"><option value="">Не отмечено</option><option>Выполнено</option><option>Нарушение</option><option>Не применимо</option></select><input id="m${i.id}" placeholder="Комментарий" value="${esc(i.comment||'')}"><button onclick="saveCheck(${i.id})">Сохранить</button></div>`).join('')||'<p class="muted">Совпадений нет.</p>';
+ items.forEach(i=>$('#c'+i.id).value=i.result||'');
+}
+$('#checkSearch').addEventListener('input',renderChecklist);
 async function loadChecklist(){
  const date=$('#checkDate').value||today();
- try{
-  const d=await api('/checklist?date='+date);
-  $('#checkList').innerHTML=d.items.map(i=>`<div class="item"><b>${esc(i.title)}</b><select id="c${i.id}"><option value="">Не отмечено</option><option>Выполнено</option><option>Нарушение</option><option>Не применимо</option></select><input id="m${i.id}" placeholder="Комментарий" value="${esc(i.comment||'')}"><button onclick="saveCheck(${i.id})">Сохранить</button></div>`).join('')||'<p class="muted">Пункты чек-листа ещё не добавлены.</p>';
-  d.items.forEach(i=>$('#c'+i.id).value=i.result||'');
- }catch(e){$('#checkList').textContent=e.message}
+ try{const d=await api('/checklist?date='+date);allChecklistItems=d.items||[];renderChecklist()}
+ catch(e){$('#checkList').textContent=e.message}
 }
 
 async function saveCheck(id){
@@ -421,22 +438,27 @@ $('#photoReportForm').onsubmit=async e=>{
  catch(x){alert(x.message)}
 };
 
+function renderPhotoReports(){
+ const el=$('#photoReportList');if(!el)return;
+ const q=searchNorm($('#photoReportSearch')?.value);
+ const reports=allPhotoReports.filter(p=>matchesSearch(q,p.engineer_name,p.organization_name,p.description,p.status,p.reviewer_name));
+ el.innerHTML=reports.map(p=>{
+  const cls=p.status==='Подтверждено'?'success':p.status==='Отклонено'?'error':'muted';
+  const review=me.role==='admin'&&p.status==='На проверке';
+  return `<article class="item"><div class="row"><b>${esc(p.engineer_name)}</b><span class="status ${cls}">${esc(p.status)}</span></div>`+
+   `<p>${esc(p.description)}</p><p class="muted">${esc(p.organization_name||'Без организации')} · ${esc(fmtDate(p.created_at))}</p>`+
+   `<a href="/api/photo-reports/${p.id}/file" target="_blank"><img class="photo" src="/api/photo-reports/${p.id}/file" alt="Фотоотчёт"></a>`+
+   (p.reviewer_name?`<p class="muted">Проверил: ${esc(p.reviewer_name)} · ${esc(fmtDate(p.reviewed_at))}</p>`:'')+
+   (review?`<div class="actions"><button onclick="reviewPhotoReport(${p.id},'approve')">Подтвердить</button><button class="danger" onclick="reviewPhotoReport(${p.id},'reject')">Отклонить</button></div>`:'')+
+   (me.role==='admin'?`<button class="danger" onclick="deletePhotoReport(${p.id})">Удалить из базы</button>`:'')+
+  `</article>`;
+ }).join('')||'<p class="muted">Совпадений нет.</p>';
+}
+$('#photoReportSearch').addEventListener('input',renderPhotoReports);
 async function loadPhotoReports(){
  const el=$('#photoReportList');if(!el)return;
- try{
-  const d=await api('/photo-reports');
-  el.innerHTML=(d.reports||[]).map(p=>{
-   const cls=p.status==='Подтверждено'?'success':p.status==='Отклонено'?'error':'muted';
-   const review=me.role==='admin'&&p.status==='На проверке';
-   return `<article class="item"><div class="row"><b>${esc(p.engineer_name)}</b><span class="status ${cls}">${esc(p.status)}</span></div>`+
-    `<p>${esc(p.description)}</p><p class="muted">${esc(p.organization_name||'Без организации')} · ${esc(fmtDate(p.created_at))}</p>`+
-    `<a href="/api/photo-reports/${p.id}/file" target="_blank"><img class="photo" src="/api/photo-reports/${p.id}/file" alt="Фотоотчёт"></a>`+
-    (p.reviewer_name?`<p class="muted">Проверил: ${esc(p.reviewer_name)} · ${esc(fmtDate(p.reviewed_at))}</p>`:'')+
-    (review?`<div class="actions"><button onclick="reviewPhotoReport(${p.id},'approve')">Подтвердить</button><button class="danger" onclick="reviewPhotoReport(${p.id},'reject')">Отклонить</button></div>`:'')+
-    (me.role==='admin'?`<button class="danger" onclick="deletePhotoReport(${p.id})">Удалить из базы</button>`:'')+
-   `</article>`;
-  }).join('')||'<p class="muted">Фотоотчётов пока нет.</p>';
- }catch(e){el.textContent=e.message}
+ try{const d=await api('/photo-reports');allPhotoReports=d.reports||[];renderPhotoReports()}
+ catch(e){el.textContent=e.message}
 }
 
 async function reviewPhotoReport(id,action){
@@ -453,8 +475,14 @@ $('#docForm').onsubmit=async e=>{
  catch(x){alert(x.message)}
 };
 
+function renderDocs(){
+ const q=searchNorm($('#docSearch')?.value);
+ const list=allDocuments.filter(x=>matchesSearch(q,x.title,x.uploaded_at));
+ $('#docList').innerHTML=list.map(x=>`<div class="item"><a href="/api/documents/${x.id}">${esc(x.title)}</a><small> · ${esc(x.uploaded_at)}</small></div>`).join('')||'<p class="muted">Совпадений нет.</p>';
+}
+$('#docSearch').addEventListener('input',renderDocs);
 async function loadDocs(){
- try{const d=await api('/documents');$('#docList').innerHTML=d.documents.map(x=>`<div class="item"><a href="/api/documents/${x.id}">${esc(x.title)}</a><small> · ${esc(x.uploaded_at)}</small></div>`).join('')||'<p class="muted">Документов пока нет.</p>'}
+ try{const d=await api('/documents');allDocuments=d.documents||[];renderDocs()}
  catch(e){$('#docList').textContent=e.message}
 }
 
@@ -474,13 +502,19 @@ $('#checkItemForm').onsubmit=async e=>{
  catch(x){alert(x.message)}
 };
 
+function renderAdminUsers(){
+ const q=searchNorm($('#userSearch')?.value);
+ const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён'));
+ $('#userList').innerHTML=users.map(x=>`<div class="item">${esc(x.full_name)} · ${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</div>`).join('')||'<p class="muted">Совпадений нет.</p>';
+}
+$('#userSearch').addEventListener('input',renderAdminUsers);
 async function loadAdmin(){
  if(me.role!=='admin')return;
  try{
   const [o,u,a]=await Promise.all([api('/organizations'),api('/users'),api('/access-audit')]);
   $('#orgList').innerHTML=o.organizations.map(x=>`<div class="item">${esc(x.name)} <span class="muted">ID ${x.id}</span></div>`).join('');
   $('#orgSelect').innerHTML='<option value="">Без организации</option>'+o.organizations.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
-  $('#userList').innerHTML=u.users.map(x=>`<div class="item">${esc(x.full_name)} · ${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</div>`).join('');
+  allUsers=u.users||[];renderAdminUsers();
   $('#accessAudit').innerHTML=a.events.length?a.events.map(x=>'<div class="history"><b>'+esc(x.action)+'</b><div>'+esc(x.target_name||'Пользователь удалён')+' · '+esc(x.target_username||'')+'</div><small>'+esc(x.actor_name||'Администратор')+' · '+esc(x.created_at)+'</small></div>').join(''):'<p class="muted">Действий пока нет.</p>';
  }catch(e){$('#accessAudit').innerHTML='<p class="error">Не удалось загрузить историю: '+esc(e.message)+'</p>';console.error(e)}
 }
