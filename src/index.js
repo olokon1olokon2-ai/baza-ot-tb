@@ -48,7 +48,7 @@ async function currentUser(request, env) {
   if (!token) return null;
   const tokenHash = await digest(token);
   return await env.DB.prepare(`
-    SELECT u.id,u.username,u.full_name,u.role,u.organization_id
+    SELECT u.id,u.username,u.full_name,u.role,u.organization_id,u.can_submit_photo_reports
     FROM sessions s JOIN users u ON u.id=s.user_id
     WHERE s.token_hash=? AND s.expires_at>? AND u.active=1
   `).bind(tokenHash, new Date().toISOString()).first();
@@ -170,10 +170,28 @@ async function api(request, env) {
   if (path === "/api/users" && method === "GET") {
     if (!adminOnly(user)) return json({ error: "Недостаточно прав" }, 403);
     const rows = await env.DB.prepare(`
-      SELECT id,username,full_name,role,organization_id,active
+      SELECT id,username,full_name,role,organization_id,active,can_submit_photo_reports
       FROM users ORDER BY full_name
     `).all();
     return json({ users: rows.results });
+  }
+
+  const photoPermissionMatch = path.match(/^\/api\/users\/(\d+)\/photo-report-permission$/);
+  if (photoPermissionMatch && method === "PATCH") {
+    if (!adminOnly(user)) return json({ error: "Только администратор может менять право на фотоотчёты" }, 403);
+    const targetId = Number(photoPermissionMatch[1]);
+    const target = await env.DB.prepare("SELECT id,full_name,role FROM users WHERE id=?")
+      .bind(targetId).first();
+    if (!target) return json({ error: "Пользователь не найден" }, 404);
+    if (target.role !== "engineer") return json({ error: "Специальное право можно выдать только инженеру" }, 400);
+    const body = await request.json();
+    if (typeof body.enabled !== "boolean") return json({ error: "Укажите новое состояние права" }, 400);
+    const enabled = body.enabled ? 1 : 0;
+    await env.DB.prepare("UPDATE users SET can_submit_photo_reports=? WHERE id=?")
+      .bind(enabled, targetId).run();
+    await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)")
+      .bind(user.id, targetId, enabled ? "Выдано право на фотоотчёты" : "Снято право на фотоотчёты").run();
+    return json({ ok: true, enabled: Boolean(enabled) });
   }
 
   if (path === "/api/access-audit" && method === "GET") {
@@ -591,6 +609,9 @@ async function api(request, env) {
 
   if (path === "/api/photo-reports" && method === "POST") {
     if (user.role !== "engineer") return json({ error: "Фотоотчёт отправляет ответственный инженер" }, 403);
+    if (Number(user.can_submit_photo_reports) !== 1) {
+      return json({ error: "Администратор ещё не выдал вам право на отправку фотоотчётов" }, 403);
+    }
     const form = await request.formData();
     const file = form.get("file");
     const description = String(form.get("description") || "").trim();
