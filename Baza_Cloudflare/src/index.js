@@ -217,8 +217,16 @@ async function api(request, env) {
     const b=await request.json();
     if(!b.username||!b.fullName||!b.password||b.password.length<12) return json({error:"Заполните ФИО, логин и пароль от 12 символов"},400);
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))), hash=await passwordHash(b.password,salt);
-    try { const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,?)").bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer").run(); return json({ok:true,id:r.meta.last_row_id}); }
-    catch { return json({error:"Логин уже занят"},409); }
+    try {
+      const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,?)")
+        .bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer").run();
+      await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)")
+        .bind(user.id,r.meta.last_row_id,"Создан пользователь").run();
+      return json({ok:true,id:r.meta.last_row_id});
+    } catch (error) {
+      if (String(error).toLowerCase().includes("unique")) return json({error:"Логин уже занят"},409);
+      throw error;
+    }
   }
   const userAccessMatch=path.match(/^\/api\/users\/(\d+)\/(reactivate|reset-password)$/);
   if(userAccessMatch && method==="POST") {
