@@ -186,6 +186,7 @@ function showApp(){
  $('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');
  $('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':'Инженер ОТ и ТБ');
  $('#adminTab').classList.toggle('hidden',me.role!=='admin');
+ $('#photoReportForm').classList.toggle('hidden',me.role!=='engineer');
  tab('tasks');loadAll();
 }
 function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
