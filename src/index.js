@@ -614,10 +614,10 @@ async function api(request, env) {
     return new Response(object.body, { headers: { "content-type": report.content_type, "cache-control": "private, no-store" } });
   }
 
-  const reportActionMatch = path.match(/^\/api\/photo-reports\/(\d+)$/);
-  if (reportActionMatch && method === "DELETE") {
+  const reportDeleteMatch = path.match(/^\/api\/photo-reports\/(\d+)$/);
+  if (reportDeleteMatch && method === "DELETE") {
     if (!adminOnly(user)) return json({ error: "Удалять фотоотчёты может только администратор" }, 403);
-    const id = Number(reportActionMatch[1]);
+    const id = Number(reportDeleteMatch[1]);
     const report = await env.DB.prepare("SELECT id,file_key FROM photo_reports WHERE id=?").bind(id).first();
     if (!report) return json({ error: "Фотоотчёт не найден" }, 404);
     if (env.FILES && report.file_key) await env.FILES.delete(report.file_key);
