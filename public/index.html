@@ -522,7 +522,8 @@ function renderAdminUsers(){
   const permissionControl=x.role==='engineer'
    ? `<p class="muted">Право на фото: <b class="${canSend?'success':'error'}">${canSend?'выдано':'не выдано'}</b></p><button class="secondary" onclick="togglePhotoReportPermission(${Number(x.id)},${canSend})">${canSend?'Снять право':'Дать право на фото'}</button>`
    : '';
-  return `<div class="item"><b>${esc(x.full_name)}</b><p class="muted">${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</p>${permissionControl}</div>`;
+  const roleNames={admin:'Администратор',responsible:'Ответственный сотрудник',engineer:'Инженер ОТ и ТБ'};
+  return `<div class="item"><b>${esc(x.full_name)}</b><p class="muted">${esc(x.username)} · ${esc(roleNames[x.role]||x.role)} · ${x.active?'активен':'отключён'}</p>${permissionControl}</div>`;
  }).join('')||'<p class="muted">Совпадений нет.</p>';
 }
 $('#userSearch').addEventListener('input',renderAdminUsers);
