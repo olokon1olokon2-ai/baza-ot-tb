@@ -156,6 +156,8 @@ h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}h3{font-size:16px}
     <button>Создать пользователя</button>
    </form>
    <div id="userList"></div>
+   <h3>История действий с доступом</h3>
+   <div id="accessAudit" class="muted">Загрузка истории…</div>
    <h3>Пункты чек-листа</h3>
    <form id="checkItemForm">
     <input name="title" placeholder="Название пункта проверки" required>
@@ -473,11 +475,12 @@ $('#checkItemForm').onsubmit=async e=>{
 async function loadAdmin(){
  if(me.role!=='admin')return;
  try{
-  const [o,u]=await Promise.all([api('/organizations'),api('/users')]);
+  const [o,u,a]=await Promise.all([api('/organizations'),api('/users'),api('/access-audit')]);
   $('#orgList').innerHTML=o.organizations.map(x=>`<div class="item">${esc(x.name)} <span class="muted">ID ${x.id}</span></div>`).join('');
   $('#orgSelect').innerHTML='<option value="">Без организации</option>'+o.organizations.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
   $('#userList').innerHTML=u.users.map(x=>`<div class="item">${esc(x.full_name)} · ${esc(x.username)} · ${esc(x.role)} · ${x.active?'активен':'отключён'}</div>`).join('');
- }catch(e){console.error(e)}
+  $('#accessAudit').innerHTML=a.events.length?a.events.map(x=>'<div class="history"><b>'+esc(x.action)+'</b><div>'+esc(x.target_name||'Пользователь удалён')+' · '+esc(x.target_username||'')+'</div><small>'+esc(x.actor_name||'Администратор')+' · '+esc(x.created_at)+'</small></div>').join(''):'<p class="muted">Действий пока нет.</p>';
+ }catch(e){$('#accessAudit').innerHTML='<p class="error">Не удалось загрузить историю: '+esc(e.message)+'</p>';console.error(e)}
 }
 
 async function loadAll(){await Promise.all([loadTasks(),loadChecklist(),loadDocs(),loadAdmin()])}
