@@ -431,19 +431,21 @@ async function loadPhotoReports(){
    return `<article class="item"><div class="row"><b>${esc(p.engineer_name)}</b><span class="status ${cls}">${esc(p.status)}</span></div>`+
     `<p>${esc(p.description)}</p><p class="muted">${esc(p.organization_name||'Без организации')} · ${esc(fmtDate(p.created_at))}</p>`+
     `<a href="/api/photo-reports/${p.id}/file" target="_blank"><img class="photo" src="/api/photo-reports/${p.id}/file" alt="Фотоотчёт"></a>`+
-    (p.review_comment?`<p class="error"><b>Причина отклонения:</b> ${esc(p.review_comment)}</p>`:'')+
     (p.reviewer_name?`<p class="muted">Проверил: ${esc(p.reviewer_name)} · ${esc(fmtDate(p.reviewed_at))}</p>`:'')+
-    (review?`<textarea id="photoReason${p.id}" placeholder="Причина отклонения (обязательно при отказе)"></textarea><div class="actions"><button onclick="reviewPhotoReport(${p.id},'approve')">Подтвердить</button><button class="danger" onclick="reviewPhotoReport(${p.id},'reject')">Отклонить</button></div>`:'')+
+    (review?`<div class="actions"><button onclick="reviewPhotoReport(${p.id},'approve')">Подтвердить</button><button class="danger" onclick="reviewPhotoReport(${p.id},'reject')">Отклонить</button></div>`:'')+
+    (me.role==='admin'?`<button class="danger" onclick="deletePhotoReport(${p.id})">Удалить из базы</button>`:'')+
    `</article>`;
   }).join('')||'<p class="muted">Фотоотчётов пока нет.</p>';
  }catch(e){el.textContent=e.message}
 }
 
 async function reviewPhotoReport(id,action){
- const comment=$('#photoReason'+id)?.value.trim()||'';
- if(action==='reject'&&!comment){alert('Укажите причину отклонения');return}
  if(!confirm(action==='approve'?'Подтвердить этот фотоотчёт?':'Отклонить этот фотоотчёт?'))return;
- try{await api('/photo-reports/'+id,{method:'PATCH',body:JSON.stringify({action,comment})});await loadPhotoReports()}catch(e){alert(e.message)}
+ try{await api('/photo-reports/'+id,{method:'PATCH',body:JSON.stringify({action})});await loadPhotoReports()}catch(e){alert(e.message)}
+}
+async function deletePhotoReport(id){
+ if(!confirm('Удалить фотоотчёт, запись и сам файл без возможности восстановления?'))return;
+ try{await api('/photo-reports/'+id,{method:'DELETE'});await loadPhotoReports()}catch(e){alert(e.message)}
 }
 // Документы
 $('#docForm').onsubmit=async e=>{
