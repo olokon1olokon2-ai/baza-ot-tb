@@ -202,6 +202,16 @@ async function api(request, env) {
     const rows=await env.DB.prepare("SELECT id,username,full_name,role,active FROM users ORDER BY full_name").all();
     return json({users:rows.results});
   }
+  if(path==="/api/access-audit" && method==="GET") {
+    if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
+    const rows=await env.DB.prepare(`SELECT a.id,a.action,a.created_at,
+      actor.full_name actor_name,target.full_name target_name,target.username target_username
+      FROM access_audit a
+      LEFT JOIN users actor ON actor.id=a.actor_id
+      LEFT JOIN users target ON target.id=a.target_user_id
+      ORDER BY a.id DESC LIMIT 100`).all();
+    return json({events:rows.results});
+  }
   if(path==="/api/users" && method==="POST") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const b=await request.json();
@@ -210,6 +220,28 @@ async function api(request, env) {
     try { const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,?)").bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer").run(); return json({ok:true,id:r.meta.last_row_id}); }
     catch { return json({error:"Логин уже занят"},409); }
   }
+  const userAccessMatch=path.match(/^\/api\/users\/(\d+)\/(reactivate|reset-password)$/);
+  if(userAccessMatch && method==="POST") {
+    if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
+    const id=Number(userAccessMatch[1]), action=userAccessMatch[2];
+    if(!Number.isInteger(id)||id<1) return json({error:"Неверный пользователь"},400);
+    if(id===user.id) return json({error:"Нельзя менять доступ или пароль своей учётной записи здесь"},400);
+    const target=await env.DB.prepare("SELECT id,active FROM users WHERE id=?").bind(id).first();
+    if(!target) return json({error:"Пользователь не найден"},404);
+    if(action==="reactivate") {
+      if(target.active) return json({error:"Пользователь уже активен"},409);
+      await env.DB.prepare("UPDATE users SET active=1 WHERE id=?").bind(id).run();
+      await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)").bind(user.id,id,"Доступ восстановлен").run();
+      return json({ok:true,reactivated:true});
+    }
+    const body=await request.json(), password=String(body.password||"");
+    if(password.length<12) return json({error:"Новый пароль должен содержать не менее 12 символов"},400);
+    const salt=b64(crypto.getRandomValues(new Uint8Array(16))), hash=await passwordHash(password,salt);
+    await env.DB.prepare("UPDATE users SET password_hash=? WHERE id=?").bind(hash,id).run();
+    await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id).run();
+    await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)").bind(user.id,id,"Пароль сброшен").run();
+    return json({ok:true,passwordReset:true});
+  }
   if(path.startsWith("/api/users/") && method==="DELETE") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const id=Number(path.split("/").pop());
@@ -217,7 +249,10 @@ async function api(request, env) {
     if(id===user.id) return json({error:"Нельзя удалить собственную учётную запись"},400);
     const target=await env.DB.prepare("SELECT id,active FROM users WHERE id=?").bind(id).first();
     if(!target) return json({error:"Пользователь не найден"},404);
+    if(!target.active) return json({ok:true,disabled:true});
     await env.DB.prepare("UPDATE users SET active=0 WHERE id=?").bind(id).run();
+    await env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id).run();
+    await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)").bind(user.id,id,"Доступ отключён").run();
     return json({ok:true,disabled:true});
   }
   if(path==="/api/tasks" && method==="GET") {
