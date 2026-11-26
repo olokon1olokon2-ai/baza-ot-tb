@@ -44,7 +44,7 @@ main{max-width:1440px;margin:28px auto;padding:0 22px}
 .tabs button{width:100%;min-height:47px;text-align:left;padding:12px 15px;border-radius:12px;background:#fff8d8;color:#554600;border:1px solid #f0df9b;font-weight:700;transition:background .15s,border-color .15s}
 .tabs button:hover{background:#ffefaa;border-color:#e5bd24}
 .tabs button.secondary{background:#f5f2e7;color:#5b5849;border-color:#e8e3d4}
-#app>.panel>#tasks,#app>.panel>#checklist,#app>.panel>#docs,#app>.panel>#photoreports,#app>.panel>#certificates,#app>.panel>#admin{grid-column:2;grid-row:1;min-width:0}
+#app>.panel>#tasks,#app>.panel>#checklist,#app>.panel>#docs,#app>.panel>#photouploads,#app>.panel>#photoreports,#app>.panel>#certificates,#app>.panel>#admin{grid-column:2;grid-row:1;min-width:0}
 h2{font-size:21px;color:#342d13;margin:0 0 18px;padding-bottom:12px;border-bottom:2px solid #f4d65c}
 h3{color:#514516}
 input,select,textarea{background:#fffefa;border:1px solid #e2d8b8;color:#292719;border-radius:10px;padding:12px}
@@ -81,7 +81,7 @@ a{color:#876600;font-weight:700}
  #app>.panel:has(.tabs){display:flex;flex-direction:column;gap:14px;padding:12px}
  .tabs{position:static;display:flex;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;width:100%;padding:2px 1px 9px;gap:7px;border-bottom:1px solid #eee3bd}
  .tabs button{width:auto;min-width:max-content;min-height:42px;padding:10px 13px;text-align:center;font-size:13px}
- #app>.panel>#tasks,#app>.panel>#checklist,#app>.panel>#docs,#app>.panel>#photoreports,#app>.panel>#certificates,#app>.panel>#admin{width:100%}
+ #app>.panel>#tasks,#app>.panel>#checklist,#app>.panel>#docs,#app>.panel>#photouploads,#app>.panel>#photoreports,#app>.panel>#certificates,#app>.panel>#admin{width:100%}
  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
  .counter{min-height:74px;padding:10px;font-size:13px}
  .counter b{font-size:22px}
@@ -133,6 +133,7 @@ a{color:#876600;font-weight:700}
    <button onclick="tab('tasks')">Задания</button>
    <button id="checklistTab" onclick="tab('checklist')">Ежедневный обход</button>
    <button id="docsTab" onclick="tab('docs')">Документы</button>
+   <button onclick="tab('photouploads')">Фотоотчёты</button>
    <button id="photoReportTab" onclick="tab('photoreports')">Фото</button>
    <button id="certificatesTab" onclick="tab('certificates')">Удостоверения</button>
    <button id="adminTab" class="secondary hidden" onclick="tab('admin')">Администрирование</button>
@@ -174,19 +175,23 @@ a{color:#876600;font-weight:700}
    <div id="docList"></div>
   </div>
 
-  <div id="photoreports" class="hidden">
-   <h2>Фото</h2>
-   <p class="muted">Раздел «Фото» отдельный. Отправлять фотографии могут только инженеры ОТ и ТБ, которым администратор выдал специальное право. Администратор проверяет и подтверждает либо отклоняет их.</p>
-   <p id="photoReportPermissionNotice" class="muted hidden">Администратор ещё не выдал вам специальное право на отправку фото. Обратитесь к администратору.</p>
+  <div id="photouploads" class="hidden">
+   <h2>Фотоотчёты</h2>
+   <p class="muted">Раздел доступен всем пользователям. Загрузите фотографию без описания. Она появится в закрытом разделе «Фото» у администратора и ответственных сотрудников.</p>
    <form id="photoReportForm" class="item">
-    <h3>Отправить фотографию администратору</h3>
+    <h3>Отправить фотоотчёт</h3>
     <label>Фотография с телефона или из галереи</label>
     <input name="file" type="file" accept="image/*" capture="environment" required>
-    <textarea name="description" placeholder="Опишите объект, место и что изображено на фото" required></textarea>
-    <button>Отправить на проверку</button>
+    <button>Отправить фотоотчёт</button>
    </form>
-   <div class="row"><h3>Фото</h3><button class="secondary" style="max-width:150px" onclick="loadPhotoReports()">Обновить</button></div>
-   <input id="photoReportSearch" type="search" placeholder="Поиск фото: инженер, организация, описание, статус">
+   <p id="photoUploadMessage" class="muted"></p>
+  </div>
+
+  <div id="photoreports" class="hidden">
+   <h2>Фото</h2>
+   <p class="muted">Закрытый раздел. Доступен только администратору и ответственным сотрудникам. Здесь можно подтвердить фотографию или отклонить её.</p>
+   <div class="row"><h3>Фотографии на проверке</h3><button class="secondary" style="max-width:150px" onclick="loadPhotoReports()">Обновить</button></div>
+   <input id="photoReportSearch" type="search" placeholder="Поиск фото: сотрудник, организация, статус">
    <div id="photoReportList"></div>
   </div>
 
@@ -258,21 +263,18 @@ function searchNorm(s){return String(s??'').normalize('NFKC').toLocaleLowerCase(
 function matchesSearch(query,...values){return !query||values.some(v=>searchNorm(v).includes(query))}
 function showLogin(){$('#login').classList.remove('hidden');$('#setup').classList.add('hidden')}
 function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.remove('hidden')}
-function tab(name){['tasks','checklist','docs','photoreports','certificates','admin'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='tasks')loadTasks();if(name==='certificates')loadCertificates();if(name==='photoreports')loadPhotoReports()}
+function tab(name){['tasks','checklist','docs','photouploads','photoreports','certificates','admin'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='tasks')loadTasks();if(name==='certificates')loadCertificates();if(name==='photoreports')loadPhotoReports()}
 function showApp(){
  $('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');
  const roleNames={admin:'Администратор',responsible:'Ответственный сотрудник',engineer:'Инженер ОТ и ТБ'};
  $('#who').textContent=me.full_name+' · '+(roleNames[me.role]||'Пользователь');
  $('#adminTab').classList.toggle('hidden',me.role!=='admin');
- const isEngineer=me.role==='engineer', isResponsible=me.role==='responsible';
- const canSendPhotoReports=isEngineer&&Number(me.can_submit_photo_reports)===1;
- $('#photoReportTab').classList.toggle('hidden',isResponsible);
+ const isResponsible=me.role==='responsible';
+ $('#photoReportTab').classList.toggle('hidden',me.role!=='admin'&&!isResponsible);
  $('#checklistTab').classList.toggle('hidden',isResponsible);
  $('#docsTab').classList.toggle('hidden',isResponsible);
  $('#certificatesTab').classList.toggle('hidden',isResponsible);
  $('#taskForm').classList.toggle('hidden',isResponsible);
- $('#photoReportForm').classList.toggle('hidden',!canSendPhotoReports);
- $('#photoReportPermissionNotice').classList.toggle('hidden',!isEngineer||canSendPhotoReports);
  tab('tasks');loadAll();
 }
 function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -508,32 +510,32 @@ async function saveCheck(id){
 }
 $('#checkDate').value=today();$('#checkDate').onchange=loadChecklist;
 
-// Фото инженеров: отправка и проверка администратором
+// Фотоотчёты доступны всем авторизованным пользователям; проверка — в закрытом разделе «Фото».
 $('#photoReportForm').onsubmit=async e=>{
  e.preventDefault();
- try{await api('/photo-reports',{method:'POST',body:new FormData(e.target)});e.target.reset();alert('Фото отправлено администратору на проверку');await loadPhotoReports()}
- catch(x){alert(x.message)}
+ const msg=$('#photoUploadMessage');msg.textContent='Отправляем фотографию…';
+ try{await api('/photo-reports',{method:'POST',body:new FormData(e.target)});e.target.reset();msg.textContent='Фотоотчёт отправлен. Он появится в закрытом разделе «Фото».'}
+ catch(x){msg.textContent=x.message}
 };
 
 function renderPhotoReports(){
  const el=$('#photoReportList');if(!el)return;
  const q=searchNorm($('#photoReportSearch')?.value);
- const reports=allPhotoReports.filter(p=>matchesSearch(q,p.engineer_name,p.organization_name,p.description,p.status,p.reviewer_name));
+ const reports=allPhotoReports.filter(p=>matchesSearch(q,p.engineer_name,p.organization_name,p.status,p.reviewer_name));
  el.innerHTML=reports.map(p=>{
-  const cls=p.status==='Подтверждено'?'success':p.status==='Отклонено'?'error':'muted';
-  const review=me.role==='admin'&&p.status==='На проверке';
+  const cls=p.status==='Подтверждено'?'success':'muted';
+  const review=p.status==='На проверке';
   return `<article class="item"><div class="row"><b>${esc(p.engineer_name)}</b><span class="status ${cls}">${esc(p.status)}</span></div>`+
-   `<p>${esc(p.description)}</p><p class="muted">${esc(p.organization_name||'Без организации')} · ${esc(fmtDate(p.created_at))}</p>`+
+   `<p class="muted">${esc(p.organization_name||'Без организации')} · ${esc(fmtDate(p.created_at))}</p>`+
    `<a href="/api/photo-reports/${p.id}/file" target="_blank"><img class="photo" src="/api/photo-reports/${p.id}/file" alt="Фото"></a>`+
    (p.reviewer_name?`<p class="muted">Проверил: ${esc(p.reviewer_name)} · ${esc(fmtDate(p.reviewed_at))}</p>`:'')+
    (review?`<div class="actions"><button onclick="reviewPhotoReport(${p.id},'approve')">Подтвердить</button><button class="danger" onclick="reviewPhotoReport(${p.id},'reject')">Отклонить</button></div>`:'')+
-   (me.role==='admin'?`<button class="danger" onclick="deletePhotoReport(${p.id})">Удалить из базы</button>`:'')+
   `</article>`;
  }).join('')||'<p class="muted">Совпадений нет.</p>';
 }
 $('#photoReportSearch').addEventListener('input',renderPhotoReports);
 async function loadPhotoReports(){
- const el=$('#photoReportList');if(!el)return;
+ const el=$('#photoReportList');if(!el||!['admin','responsible'].includes(me.role))return;
  try{const d=await api('/photo-reports');allPhotoReports=d.reports||[];renderPhotoReports()}
  catch(e){el.textContent=e.message}
 }
@@ -542,10 +544,7 @@ async function reviewPhotoReport(id,action){
  if(!confirm(action==='approve'?'Подтвердить эту фотографию?':'Отклонить эту фотографию?'))return;
  try{await api('/photo-reports/'+id,{method:'PATCH',body:JSON.stringify({action})});await loadPhotoReports()}catch(e){alert(e.message)}
 }
-async function deletePhotoReport(id){
- if(!confirm('Удалить фотографию, запись и сам файл без возможности восстановления?'))return;
- try{await api('/photo-reports/'+id,{method:'DELETE'});await loadPhotoReports()}catch(e){alert(e.message)}
-}
+
 // Документы
 $('#docForm').onsubmit=async e=>{
  e.preventDefault();try{await api('/documents',{method:'POST',body:new FormData(e.target)});e.target.reset();loadDocs()}
@@ -581,14 +580,10 @@ $('#checkItemForm').onsubmit=async e=>{
 
 function renderAdminUsers(){
  const q=searchNorm($('#userSearch')?.value);
- const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён',Number(x.can_submit_photo_reports)===1?'право на фото':'без права на фото'));
+ const users=allUsers.filter(x=>matchesSearch(q,x.full_name,x.username,x.role,x.active?'активен':'отключён'));
  $('#userList').innerHTML=users.map(x=>{
-  const canSend=Number(x.can_submit_photo_reports)===1;
-  const permissionControl=x.role==='engineer'
-   ? `<p class="muted">Право на фото: <b class="${canSend?'success':'error'}">${canSend?'выдано':'не выдано'}</b></p><button class="secondary" onclick="togglePhotoReportPermission(${Number(x.id)},${canSend})">${canSend?'Снять право':'Дать право на фото'}</button>`
-   : '';
   const roleNames={admin:'Администратор',responsible:'Ответственный сотрудник',engineer:'Инженер ОТ и ТБ'};
-  return `<div class="item"><b>${esc(x.full_name)}</b><p class="muted">${esc(x.username)} · ${esc(roleNames[x.role]||x.role)} · ${x.active?'активен':'отключён'}</p>${permissionControl}</div>`;
+  return `<div class="item"><b>${esc(x.full_name)}</b><p class="muted">${esc(x.username)} · ${esc(roleNames[x.role]||x.role)} · ${x.active?'активен':'отключён'}</p></div>`;
  }).join('')||'<p class="muted">Совпадений нет.</p>';
 }
 $('#userSearch').addEventListener('input',renderAdminUsers);
