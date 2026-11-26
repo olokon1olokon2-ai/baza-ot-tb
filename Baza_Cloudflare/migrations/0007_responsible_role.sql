@@ -1,14 +1,3 @@
--- Extend the existing SQLite role constraint without rebuilding the users table
--- or disturbing foreign-key references from sessions, tasks, documents and audit rows.
-PRAGMA writable_schema = ON;
-UPDATE sqlite_schema
-SET sql = replace(
-  sql,
-  "CHECK(role IN ('admin','engineer'))",
-  "CHECK(role IN ('admin','engineer','responsible'))"
-)
-WHERE type='table'
-  AND name='users'
-  AND instr(sql, "CHECK(role IN ('admin','engineer'))") > 0;
-PRAGMA writable_schema = OFF;
-PRAGMA schema_version = 1000;
+-- Store responsible access separately instead of changing the constrained role column.
+-- Existing users and all foreign-key relationships remain untouched.
+ALTER TABLE users ADD COLUMN is_responsible INTEGER NOT NULL DEFAULT 0 CHECK(is_responsible IN (0,1));
