@@ -368,7 +368,7 @@ async function loadViolationPhotos(){
    '<p class="muted">'+esc(p.created_at||'')+' · '+esc(p.original_name||'Фото')+'</p>'+
    (p.description?'<p>'+esc(p.description)+'</p>':'')+
    '<a href="'+p.url+'" target="_blank"><img src="'+p.url+'" alt="Фото нарушения" class="photo" style="max-width:100%;max-height:420px;object-fit:contain"></a>'+
-   (me.role==='admin'&&p.status==='На проверке'?'<div class="actions"><button onclick="reviewViolationPhoto('+p.id+\',\'approve\')">Принять</button><button class="danger" onclick="reviewViolationPhoto('+p.id+\',\'reject\')">Отклонить</button></div>':'')+
+   (me.role==='admin'&&p.status==='На проверке'?'<div class="actions"><button onclick="reviewViolationPhoto('+p.id+',\'approve\')">Принять</button><button class="danger" onclick="reviewViolationPhoto('+p.id+',\'reject\')">Отклонить</button></div>':'')+
    '</article>').join(''):'<p class="muted">Фотографий пока нет.</p>';
  }catch(e){box.innerHTML='<p class="error">'+esc(e.message)+'</p>'}
 }
