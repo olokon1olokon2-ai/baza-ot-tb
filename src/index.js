@@ -75,6 +75,26 @@ async function getTask(id, user, env) {
   return { task };
 }
 
+async function getTaskMediaAccess(id, user, env) {
+  const task = await env.DB.prepare(`
+    SELECT t.*,u.full_name AS assigned_name,c.full_name AS creator_name
+    FROM tasks t
+    LEFT JOIN users u ON u.id=t.assigned_to
+    JOIN users c ON c.id=t.created_by
+    WHERE t.id=?
+  `).bind(id).first();
+
+  if (!task) return { error: json({ error: "Задание не найдено" }, 404) };
+
+  // Администратор и инженеры ОТ и ТБ имеют доступ к фото/видео всех заданий.
+  // Ответственный сотрудник — только к назначенным ему заданиям.
+  const allowed = user.role === "admin" || user.role === "engineer" ||
+    (user.role === "responsible" && task.assigned_to === user.id);
+
+  if (!allowed) return { error: json({ error: "Нет доступа к заданию" }, 403) };
+  return { task };
+}
+
 async function addHistory(env, taskId, userId, oldStatus, newStatus, comment = "") {
   await env.DB.prepare(`
     INSERT INTO task_history(task_id,user_id,old_status,new_status,comment)
@@ -283,7 +303,7 @@ async function api(request, env) {
   const photoListMatch = path.match(/^\/api\/tasks\/(\d+)\/photos$/);
   if (photoListMatch) {
     const id = Number(photoListMatch[1]);
-    const access = await getTask(id, user, env);
+    const access = await getTaskMediaAccess(id, user, env);
     if (access.error) return access.error;
 
     if (method === "GET") {
@@ -335,7 +355,7 @@ async function api(request, env) {
   if (photoFileMatch && method === "GET") {
     const taskId = Number(photoFileMatch[1]);
     const photoId = Number(photoFileMatch[2]);
-    const access = await getTask(taskId, user, env);
+    const access = await getTaskMediaAccess(taskId, user, env);
     if (access.error) return access.error;
 
     const photo = await env.DB.prepare(
@@ -358,7 +378,7 @@ async function api(request, env) {
   const videoListMatch = path.match(/^\/api\/tasks\/(\d+)\/videos$/);
   if (videoListMatch) {
     const id = Number(videoListMatch[1]);
-    const access = await getTask(id, user, env);
+    const access = await getTaskMediaAccess(id, user, env);
     if (access.error) return access.error;
 
     if (method === "GET") {
@@ -373,8 +393,8 @@ async function api(request, env) {
 
     if (method === "POST") {
       const task = access.task;
-      const allowedUploader = user.role === "admin" ||
-        task.assigned_to === user.id || task.created_by === user.id;
+      const allowedUploader = user.role === "admin" || user.role === "engineer" ||
+        (user.role === "responsible" && task.assigned_to === user.id);
       if (!allowedUploader) return json({ error: "Нет прав для загрузки видео" }, 403);
 
       const form = await request.formData();
@@ -414,7 +434,7 @@ async function api(request, env) {
   if (videoFileMatch && method === "GET") {
     const taskId = Number(videoFileMatch[1]);
     const videoId = Number(videoFileMatch[2]);
-    const access = await getTask(taskId, user, env);
+    const access = await getTaskMediaAccess(taskId, user, env);
     if (access.error) return access.error;
 
     const video = await env.DB.prepare(
