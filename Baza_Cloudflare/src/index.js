@@ -286,7 +286,7 @@ async function api(request, env) {
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))), hash=await passwordHash(b.password,salt);
     try {
       const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,?)")
-        .bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer").run();
+        .bind(b.username,b.fullName,hash,["admin","responsible"].includes(b.role)?b.role:"engineer").run();
       await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)")
         .bind(user.id,r.meta.last_row_id,"Создан пользователь").run();
       return json({ok:true,id:r.meta.last_row_id});
