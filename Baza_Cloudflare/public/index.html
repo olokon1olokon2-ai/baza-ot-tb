@@ -112,7 +112,7 @@ main{max-width:1500px;margin:22px auto;padding:0 18px}
 </div>
 <div class="home-grid">
 <section class="home-card">
-<div class="home-card-head"><h2>Мои задания</h2><button onclick="tab('tasks')">Найти　⌕</button></div>
+<div class="home-card-head"><h2>Мои задания</h2><button onclick="tab(&quot;tasks&quot;)">Найти　⌕</button></div>
 <div style="overflow-x:auto"><table class="home-task-table"><thead><tr><th>№</th><th>Задание</th><th>Срок</th><th>Статус</th><th>Действия</th></tr></thead><tbody id="homeTaskRows"><tr><td colspan="5" class="muted">Загрузка…</td></tr></tbody></table></div>
 </section>
 <section class="home-card">
@@ -137,7 +137,7 @@ main{max-width:1500px;margin:22px auto;padding:0 18px}
 </section>
 <nav class="mobile-nav">
 <button onclick="tab('home')" data-tab="home"><span>⌂</span>Главная</button>
-<button onclick="tab('tasks')" data-tab="tasks"><span>☑</span>Задания</button>
+<button onclick="tab(&quot;tasks&quot;)" data-tab="tasks"><span>☑</span>Задания</button>
 <button onclick="tab('photos')" data-tab="photos"><span>▣</span>Фото</button>
 <button onclick="tab('docs')" data-tab="docs"><span>▤</span>Документы</button>
 <button onclick="tab('more')" data-tab="more"><span>•••</span>Ещё</button>
@@ -339,7 +339,7 @@ async function renderHome(){
  const month=new Date();const doneMonth=done.filter(t=>{const d=new Date(t.updated_at||t.completed_at||t.created_at||0);return d.getMonth()===month.getMonth()&&d.getFullYear()===month.getFullYear()});
  $('#homeMyTasks').textContent=mine.length;$('#homeDone').textContent=doneMonth.length;$('#homeOverdue').textContent=mine.filter(isOverdue).length;
  const rows=mine.slice().sort((a,b)=>(isOverdue(a)?-1:0)-(isOverdue(b)?-1:0)).slice(0,5);
- $('#homeTaskRows').innerHTML=rows.map((t,i)=>'<tr><td>'+(i+1)+'</td><td class="task-name">'+esc(t.title)+'</td><td class="due">'+esc(t.due_date||'—')+(isOverdue(t)?'<br><small style="color:#c21d16">Просрочено</small>':'')+'</td><td><span class="pill '+(isOverdue(t)?'red':t.status==='Выполнено'?'green':t.status==='В работе'?'blue':'')+'">'+esc(isOverdue(t)?'Просрочено':t.status)+'</span></td><td><button class="home-task-open" onclick="tab('tasks')">Открыть</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">Заданий пока нет.</td></tr>';
+ $('#homeTaskRows').innerHTML=rows.map((t,i)=>'<tr><td>'+(i+1)+'</td><td class="task-name">'+esc(t.title)+'</td><td class="due">'+esc(t.due_date||'—')+(isOverdue(t)?'<br><small style="color:#c21d16">Просрочено</small>':'')+'</td><td><span class="pill '+(isOverdue(t)?'red':t.status==='Выполнено'?'green':t.status==='В работе'?'blue':'')+'">'+esc(isOverdue(t)?'Просрочено':t.status)+'</span></td><td><button class="home-task-open" onclick="tab(&quot;tasks&quot;)">Открыть</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">Заданий пока нет.</td></tr>';
  const check=$('#homeChecklistSummary');if(check){try{const d=await api('/checklist?date='+localDate());const arr=d.items||[];const marked=arr.filter(x=>x.result);const violations=arr.filter(x=>x.result==='Нарушение');check.innerHTML='<b>'+marked.length+' из '+arr.length+'</b> пунктов отмечено<br><span style="color:'+(violations.length?'#b32620':'#177245')+'">Нарушений: '+violations.length+'</span>'}catch(e){check.textContent='Сводка обхода временно недоступна'}}
 }
 async function loadAllPhotos(){
