@@ -290,10 +290,9 @@ function setEmployeeMode(mode){employeeFilter=mode;slingerExpiryFilter='all';$('
 function toggleEmployeeDetails(i){const el=$('#employeeDetails'+i);if(el)el.classList.toggle('hidden')}
 function setSlingerExpiryFilter(mode){slingerExpiryFilter=mode;$('#allSlingersBtn').classList.toggle('active',mode==='all');$('#overdueSlingersBtn').classList.toggle('active',mode==='overdue');loadEmployees()}
 function normalizeEmployeeSearch(value){
- return String(value??'').toLocaleLowerCase('ru')
+ return String(value??'').normalize('NFKC').toLocaleLowerCase('ru')
   .replace(/ё/g,'е')
-  .normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')
-  .replace(/[\\s\\p{P}\\p{S}_]+/gu,'');
+  .replace(/[\s\p{P}\p{S}_]+/gu,'');
 }
 async function fetchAllEmployeePages(slingers){
  const limit=1000,first=await api('/employees?slingers='+(slingers?'1':'0')+'&limit='+limit+'&offset=0');
