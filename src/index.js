@@ -67,9 +67,14 @@ async function getTask(id, user, env) {
 
   if (!task) return { error: json({ error: "Задание не найдено" }, 404) };
 
-  const allowed = user.role === "admin" ||
-    (user.role === "responsible" ? task.assigned_to === user.id :
-      task.organization_id === user.organization_id || task.assigned_to === user.id || task.created_by === user.id);
+  // Администратор и инженеры ОТ и ТБ могут открывать задания всех организаций.
+  // Ответственные сотрудники — только задания, назначенные им.
+  const allowed = user.role === "admin" || user.role === "engineer" ||
+    (user.role === "responsible"
+      ? Number(task.assigned_to) === Number(user.id)
+      : task.organization_id === user.organization_id ||
+        Number(task.assigned_to) === Number(user.id) ||
+        Number(task.created_by) === Number(user.id));
 
   if (!allowed) return { error: json({ error: "Нет доступа к заданию" }, 403) };
   return { task };
