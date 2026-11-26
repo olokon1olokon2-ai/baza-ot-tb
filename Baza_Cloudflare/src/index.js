@@ -35,7 +35,7 @@ async function currentUser(request, env) {
   const token = cookie(request);
   if (!token) return null;
   const tokenHash = await digest(token);
-  const row = await env.DB.prepare(`SELECT u.id,u.username,u.full_name,u.role,u.organization_id
+  const row = await env.DB.prepare(`SELECT u.id,u.username,u.full_name,CASE WHEN u.is_responsible=1 THEN 'responsible' ELSE u.role END AS role,u.organization_id
     FROM sessions s JOIN users u ON u.id=s.user_id
     WHERE s.token_hash=? AND s.expires_at>? AND u.active=1`).bind(tokenHash,new Date().toISOString()).first();
   return row || null;
@@ -89,10 +89,10 @@ async function api(request, env) {
 
   if (path === "/api/login" && method==="POST") {
     const body=await request.json();
-    const user=await env.DB.prepare("SELECT * FROM users WHERE username=? AND active=1").bind(body.username||"").first();
+    const user=await env.DB.prepare("SELECT *,CASE WHEN is_responsible=1 THEN 'responsible' ELSE role END AS effective_role FROM users WHERE username=? AND active=1").bind(body.username||"").first();
     if (!user || !(await verifyPassword(body.password||"",user.password_hash))) return json({error:"Неверный логин или пароль"},401);
     const token=await makeSession(user,env);
-    return json({ok:true,user:{id:user.id,fullName:user.full_name,role:user.role}},200,{
+    return json({ok:true,user:{id:user.id,fullName:user.full_name,role:user.effective_role}},200,{
       "Set-Cookie":`baza_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`
     });
   }
@@ -273,7 +273,7 @@ async function api(request, env) {
 
   if(path==="/api/users" && method==="GET") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
-    const rows=await env.DB.prepare("SELECT id,username,full_name,role,active FROM users ORDER BY full_name").all();
+    const rows=await env.DB.prepare("SELECT id,username,full_name,CASE WHEN is_responsible=1 THEN 'responsible' ELSE role END AS role,active FROM users ORDER BY full_name").all();
     return json({users:rows.results});
   }
   if(path==="/api/access-audit" && method==="GET") {
@@ -292,8 +292,8 @@ async function api(request, env) {
     if(!b.username||!b.fullName||!b.password||b.password.length<12) return json({error:"Заполните ФИО, логин и пароль от 12 символов"},400);
     const salt=b64(crypto.getRandomValues(new Uint8Array(16))), hash=await passwordHash(b.password,salt);
     try {
-      const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role) VALUES(?,?,?,?)")
-        .bind(b.username,b.fullName,hash,["admin","responsible"].includes(b.role)?b.role:"engineer").run();
+      const r=await env.DB.prepare("INSERT INTO users(username,full_name,password_hash,role,is_responsible) VALUES(?,?,?,?,?)")
+        .bind(b.username,b.fullName,hash,b.role==="admin"?"admin":"engineer",b.role==="responsible"?1:0).run();
       await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)")
         .bind(user.id,r.meta.last_row_id,"Создан пользователь").run();
       return json({ok:true,id:r.meta.last_row_id});
