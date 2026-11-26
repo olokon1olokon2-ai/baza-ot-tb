@@ -107,6 +107,68 @@ async function api(request, env) {
   if(auth.response) return auth.response;
   const user=auth.user;
 
+  // Закрытый раздел «Фото для нарушения»: загрузка только ответственными, проверка администратором.
+  const violationPhotosPath="/api/violation-photos";
+  if(path===violationPhotosPath && method==="GET") {
+    if(!["admin","responsible"].includes(user.role)) return json({error:"Недостаточно прав"},403);
+    const rows=user.role==="admin"
+      ? await env.DB.prepare(`SELECT p.*,u.full_name uploader_name FROM violation_photos p JOIN users u ON u.id=p.uploaded_by ORDER BY p.created_at DESC,p.id DESC`).all()
+      : await env.DB.prepare(`SELECT p.*,u.full_name uploader_name FROM violation_photos p JOIN users u ON u.id=p.uploaded_by WHERE p.uploaded_by=? ORDER BY p.created_at DESC,p.id DESC`).bind(user.id).all();
+    return json({photos:rows.results.map(p=>({...p,url:`/api/violation-photos/${p.id}/file`}))});
+  }
+  if(path===violationPhotosPath && method==="POST") {
+    if(user.role!=="responsible") return json({error:"Загружать фотографии могут только ответственные сотрудники"},403);
+    const form=await request.formData();
+    const files=form.getAll("photos").filter(f=>f instanceof File && f.size);
+    const description=String(form.get("description")||"").trim();
+    if(!files.length) return json({error:"Выберите хотя бы одну фотографию"},400);
+    if(files.length>10) return json({error:"Можно загрузить не более 10 фотографий за один раз"},400);
+    if(files.some(f=>!f.type.startsWith("image/") || f.size>12*1024*1024)) return json({error:"Каждая фотография должна быть изображением до 12 МБ"},400);
+    const created=[];
+    try {
+      for(const file of files) {
+        const key=`violation-photos/${user.id}/${crypto.randomUUID()}`;
+        await env.FILES.put(key,file.stream(),{httpMetadata:{contentType:file.type}});
+        created.push(key);
+        await env.DB.prepare("INSERT INTO violation_photos(uploaded_by,file_key,content_type,original_name,description) VALUES(?,?,?,?,?)")
+          .bind(user.id,key,file.type,file.name||"photo",description).run();
+      }
+      return json({ok:true,uploaded:created.length});
+    } catch(e) {
+      for(const key of created) await env.FILES.delete(key).catch(()=>{});
+      throw e;
+    }
+  }
+  const violationFileMatch=path.match(/^\/api\/violation-photos\/(\d+)\/file$/);
+  if(violationFileMatch && method==="GET") {
+    if(!["admin","responsible"].includes(user.role)) return json({error:"Недостаточно прав"},403);
+    const id=Number(violationFileMatch[1]);
+    const photo=await env.DB.prepare("SELECT file_key,content_type,uploaded_by FROM violation_photos WHERE id=?").bind(id).first();
+    if(!photo) return json({error:"Фотография не найдена"},404);
+    if(user.role==="responsible" && Number(photo.uploaded_by)!==Number(user.id)) return json({error:"Нет доступа к этой фотографии"},403);
+    const object=await env.FILES.get(photo.file_key);
+    if(!object) return json({error:"Файл отсутствует в хранилище"},404);
+    return new Response(object.body,{headers:{"content-type":photo.content_type||"application/octet-stream","cache-control":"private, no-store","content-disposition":"inline"}});
+  }
+  const violationReviewMatch=path.match(/^\/api\/violation-photos\/(\d+)$/);
+  if(violationReviewMatch && method==="PATCH") {
+    if(user.role!=="admin") return json({error:"Только администратор может проверять фотографии"},403);
+    const id=Number(violationReviewMatch[1]), body=await request.json();
+    if(body.action==="approve") {
+      const result=await env.DB.prepare("UPDATE violation_photos SET status='Принято',reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND status='На проверке'").bind(user.id,id).run();
+      if(!result.meta.changes) return json({error:"Фотография не найдена или уже проверена"},404);
+      return json({ok:true,status:"Принято"});
+    }
+    if(body.action==="reject") {
+      const photo=await env.DB.prepare("SELECT file_key FROM violation_photos WHERE id=?").bind(id).first();
+      if(!photo) return json({error:"Фотография не найдена"},404);
+      await env.FILES.delete(photo.file_key);
+      await env.DB.prepare("DELETE FROM violation_photos WHERE id=?").bind(id).run();
+      return json({ok:true,deleted:true});
+    }
+    return json({error:"Неизвестное действие"},400);
+  }
+
   if(path==="/api/me" && method==="GET") return json({user});
 
   if(path==="/api/employees" && method==="GET") {
