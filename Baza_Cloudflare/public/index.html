@@ -26,7 +26,7 @@ main{max-width:1500px;margin:22px auto;padding:0 18px}
 .tabs button:hover,.tabs button.nav-active{background:#ffd43b;color:#171717;transform:none}
 .tabs button.secondary{background:#fff;color:#333}
 .tabs button.secondary:hover{background:#fff3c2}
-#app>.panel>#home,#app>.panel>#tasks,#app>.panel>#checklist,#app>.panel>#docs,#app>.panel>#employees,#app>.panel>#admin,#app>.panel>#photos{grid-column:2;grid-row:1;min-width:0;background:transparent;border:0;box-shadow:none;padding:0}
+#app>.panel>#home,#app>.panel>#tasks,#app>.panel>#checklist,#app>.panel>#docs,#app>.panel>#employees,#app>.panel>#admin,#app>.panel>#photos,#app>.panel>#violationPhotos{grid-column:2;grid-row:1;min-width:0;background:transparent;border:0;box-shadow:none;padding:0}
 #app>.panel>#home.hidden,#app>.panel>#tasks.hidden{display:none!important}
 .home-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}
 .home-stat{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid #e3e6eb;border-radius:14px;padding:18px;min-height:118px}
@@ -99,6 +99,7 @@ main{max-width:1500px;margin:22px auto;padding:0 18px}
 <button onclick="tab(&quot;tasks&quot;)" data-tab="tasks">☑　Мои задания</button>
 <button onclick="tab('checklist')" data-tab="checklist">▦　Ежедневный обход</button>
 <button onclick="tab('photos')" data-tab="photos">▣　Фото</button>
+<button id="violationPhotosTab" class="hidden" onclick="tab('violationPhotos')" data-tab="violationPhotos">⚠　Фото для нарушения</button>
 <button onclick="tab('docs')" data-tab="docs">▤　Документы</button>
 <button onclick="tab('employees')" data-tab="employees">♟　Работники</button>
 <button id="adminTab" class="secondary hidden" onclick="tab('admin')" data-tab="admin">⚙　Администрирование</button>
@@ -134,11 +135,23 @@ main{max-width:1500px;margin:22px auto;padding:0 18px}
 <h2>Фотоотчёты по заданиям</h2><p class="muted">Фотографии до и после устранения нарушений, загруженные в отчёты по заданиям.</p>
 <div id="allPhotosList"></div>
 </div>
+<div id="violationPhotos" class="hidden">
+<h2>Фото для нарушения</h2>
+<p class="muted">Закрытый раздел. Ответственные сотрудники отправляют фотографии, администратор проверяет их.</p>
+<form id="violationPhotoForm" class="item hidden">
+<label>Фотографии нарушения (до 10 файлов, до 12 МБ каждый)</label>
+<input name="photos" type="file" accept="image/*" multiple required>
+<textarea name="description" placeholder="Описание нарушения (необязательно)"></textarea>
+<button>Отправить фотографии администратору</button>
+</form>
+<div id="violationPhotoList"><p class="muted">Загрузка…</p></div>
+</div>
 </section>
 <nav class="mobile-nav">
 <button onclick="tab('home')" data-tab="home"><span>⌂</span>Главная</button>
 <button onclick="tab(&quot;tasks&quot;)" data-tab="tasks"><span>☑</span>Задания</button>
 <button onclick="tab('photos')" data-tab="photos"><span>▣</span>Фото</button>
+<button id="violationPhotosMobileTab" class="hidden" onclick="tab('violationPhotos')" data-tab="violationPhotos"><span>⚠</span>Нарушения</button>
 <button onclick="tab('docs')" data-tab="docs"><span>▤</span>Документы</button>
 <button onclick="tab('employees')" data-tab="employees"><span>♟</span>Работники</button>
 <button onclick="tab('more')" data-tab="more"><span>•••</span>Ещё</button>
@@ -153,8 +166,8 @@ async function api(path,opts={}){const r=await fetch('/api'+path,{credentials:'s
 function showLogin(){$('#login').classList.remove('hidden');$('#setup').classList.add('hidden');$('#recovery').classList.add('hidden')}
 function showRecovery(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#recovery').classList.remove('hidden')}
 function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.remove('hidden')}
-function showApp(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':me.role==='responsible'?'Ответственный сотрудник':'Инженер ОТ и ТБ');$('#adminTab').classList.toggle('hidden',me.role!=='admin');tab('home');loadAll()}
-function tab(name){if(name==='more'){name='checklist'}['home','tasks','checklist','docs','admin','employees','photos'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('nav-active',b.dataset.tab===name));if(name==='employees'){const admin=me.role==='admin';$('#employeeImport').classList.toggle('hidden',!admin||employeeFilter==='slingers');$('#slingerImport').classList.toggle('hidden',!admin||employeeFilter!=='slingers');loadEmployees()}if(name==='photos')loadAllPhotos();if(name==='home')renderHome()}
+function showApp(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':me.role==='responsible'?'Ответственный сотрудник':'Инженер ОТ и ТБ');$('#adminTab').classList.toggle('hidden',me.role!=='admin');const canSeeViolationPhotos=['admin','responsible'].includes(me.role);$('#violationPhotosTab').classList.toggle('hidden',!canSeeViolationPhotos);$('#violationPhotosMobileTab').classList.toggle('hidden',!canSeeViolationPhotos);$('#violationPhotoForm').classList.toggle('hidden',me.role!=='responsible');tab('home');loadAll()}
+function tab(name){if(name==='more'){name='checklist'}if(name==='violationPhotos'&&!['admin','responsible'].includes(me.role))name='home';['home','tasks','checklist','docs','admin','employees','photos','violationPhotos'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('nav-active',b.dataset.tab===name));if(name==='employees'){const admin=me.role==='admin';$('#employeeImport').classList.toggle('hidden',!admin||employeeFilter==='slingers');$('#slingerImport').classList.toggle('hidden',!admin||employeeFilter!=='slingers');loadEmployees()}if(name==='photos')loadAllPhotos();if(name==='violationPhotos')loadViolationPhotos();if(name==='home')renderHome()}
 function msg(id,t,cls=''){const e=$(id);e.textContent=t;e.className=cls}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),btn=e.target.querySelector('button');btn.disabled=true;msg('#loginMsg','Проверяем данные…','muted');try{await api('/login',{method:'POST',body:JSON.stringify(b)});await init()}catch(x){showLogin();msg('#loginMsg',x.message||'Не удалось войти. Проверьте настройки сессии Worker.','error')}finally{btn.disabled=false}};
 $('#setupForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/setup',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});msg('#setupMsg','Администратор создан. Теперь войдите.','success');showLogin()}catch(x){msg('#setupMsg',x.message,'error')}};
@@ -344,6 +357,38 @@ async function renderHome(){
  $('#homeTaskRows').innerHTML=rows.map((t,i)=>'<tr><td>'+(i+1)+'</td><td class="task-name">'+esc(t.title)+'</td><td class="due">'+esc(t.due_date||'—')+(isOverdue(t)?'<br><small style="color:#c21d16">Просрочено</small>':'')+'</td><td><span class="pill '+(isOverdue(t)?'red':t.status==='Выполнено'?'green':t.status==='В работе'?'blue':'')+'">'+esc(isOverdue(t)?'Просрочено':t.status)+'</span></td><td><button class="home-task-open" onclick="tab(&quot;tasks&quot;)">Открыть</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">Заданий пока нет.</td></tr>';
  const check=$('#homeChecklistSummary');if(check){try{const d=await api('/checklist?date='+localDate());const arr=d.items||[];const marked=arr.filter(x=>x.result);const violations=arr.filter(x=>x.result==='Нарушение');check.innerHTML='<b>'+marked.length+' из '+arr.length+'</b> пунктов отмечено<br><span style="color:'+(violations.length?'#b32620':'#177245')+'">Нарушений: '+violations.length+'</span>'}catch(e){check.textContent='Сводка обхода временно недоступна'}}
 }
+async function loadViolationPhotos(){
+ const box=$('#violationPhotoList');if(!box)return;
+ box.innerHTML='<p class="muted">Загружаем фотографии…</p>';
+ try{
+  const d=await api('/violation-photos');
+  const photos=d.photos||[];
+  box.innerHTML=photos.length?photos.map(p=>'<article class="item">'+
+   '<div class="row"><b>'+esc(p.uploader_name||'Ответственный сотрудник')+'</b><span class="status '+(p.status==='Принято'?'valid':'warning')+'">'+esc(p.status)+'</span></div>'+
+   '<p class="muted">'+esc(p.created_at||'')+' · '+esc(p.original_name||'Фото')+'</p>'+
+   (p.description?'<p>'+esc(p.description)+'</p>':'')+
+   '<a href="'+p.url+'" target="_blank"><img src="'+p.url+'" alt="Фото нарушения" class="photo" style="max-width:100%;max-height:420px;object-fit:contain"></a>'+
+   (me.role==='admin'&&p.status==='На проверке'?'<div class="actions"><button onclick="reviewViolationPhoto('+p.id+\\',\\'approve\\')">Принять</button><button class="danger" onclick="reviewViolationPhoto('+p.id+\\',\\'reject\\')">Отклонить</button></div>':'')+
+   '</article>').join(''):'<p class="muted">Фотографий пока нет.</p>';
+ }catch(e){box.innerHTML='<p class="error">'+esc(e.message)+'</p>'}
+}
+$('#violationPhotoForm').onsubmit=async e=>{
+ e.preventDefault();
+ const form=e.target,files=form.elements.photos.files;
+ if(!files.length){alert('Выберите фотографии');return}
+ const button=form.querySelector('button');button.disabled=true;
+ try{
+  await api('/violation-photos',{method:'POST',body:new FormData(form)});
+  form.reset();alert('Фотографии отправлены администратору на проверку.');await loadViolationPhotos();
+ }catch(x){alert(x.message)}finally{button.disabled=false}
+};
+async function reviewViolationPhoto(id,action){
+ const promptText=action==='approve'?'Принять эту фотографию? При принятии она останется в разделе.':'Отклонить фотографию? Она будет полностью удалена вместе с файлом.';
+ if(!confirm(promptText))return;
+ try{await api('/violation-photos/'+id,{method:'PATCH',body:JSON.stringify({action})});await loadViolationPhotos()}
+ catch(e){alert(e.message)}
+}
+
 async function loadAllPhotos(){
  const box=$('#allPhotosList');if(!box)return;box.innerHTML='<p class="muted">Загружаем фотографии…</p>';
  try{const tasks=allTasks.slice().sort((a,b)=>Number(b.id)-Number(a.id));const reports=await Promise.all(tasks.slice(0,15).map(async t=>{try{return {task:t,data:await api('/tasks/'+t.id+'/report')}}catch(e){return null}}));
