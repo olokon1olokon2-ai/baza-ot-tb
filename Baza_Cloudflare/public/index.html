@@ -9,6 +9,83 @@
 <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png?v=20261120-3"><title>База — ЖК Олокон</title>
 <style>
 :root{font-family:Inter,Arial,sans-serif;color:#17231f;background:#f3f6f4}*{box-sizing:border-box}body{margin:0}header{background:linear-gradient(90deg,rgba(15,48,39,.94),rgba(15,48,39,.62)),url('https://storage.googleapis.com/bd-kg-02/buildings-v2/2560x1920/4080.jpg') center 45%/cover;color:white;padding:28px max(20px,calc((100% - 1100px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:190px}header small{opacity:.8}main{max-width:1100px;margin:26px auto;padding:0 16px}.panel{background:white;border:1px solid #e0e8e3;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 5px 20px #173b3208}.hidden{display:none!important}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}input,select,textarea,button{font:inherit;padding:11px 12px;border-radius:9px;border:1px solid #ccd8d1;width:100%;margin:5px 0}textarea{min-height:75px}button{background:#1d604d;color:white;border:0;font-weight:650;cursor:pointer}button.secondary{background:#e8efeb;color:#173b32}button.danger{background:#a33b36}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.tabs button{width:auto;padding:10px 15px}.item{border:1px solid #e3eae5;border-radius:10px;padding:13px;margin:9px 0}.muted{color:#687970;font-size:13px}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.status{font-size:12px;padding:4px 8px;background:#eaf2ed;border-radius:20px;display:inline-block}.status.overdue{background:#fde8e7;color:#a3231d;font-weight:700}.status.warning{background:#fff0d8;color:#9a5b00;font-weight:700}.status.valid{background:#e3f5e9;color:#176b43;font-weight:700}.task-filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.task-filters button{width:auto}.task-filters button.active{background:#173b32;color:#fff}.error{color:#a33b36}.success{color:#176b43}h1{font-size:22px;margin:0}h2{font-size:19px;margin-top:0}@media(max-width:600px){header{align-items:flex-start;flex-direction:column}.row{display:block}}
+
+/* Панель по утверждённому макету ЖК «Олокон» */
+:root{font-family:Arial,Helvetica,sans-serif;color:#171717;background:#f7f8fa}
+body{background:#f7f8fa;color:#171717}
+header{min-height:88px;background:#fff;color:#171717;padding:14px max(22px,calc((100% - 1500px)/2));border-bottom:1px solid #e5e7eb;box-shadow:0 2px 12px #1111}
+header:before{content:"🏢";font-size:42px;margin-right:10px}
+header>div:first-child{display:flex;align-items:center;gap:10px}
+header h1{font-size:28px;font-weight:850;letter-spacing:-1px}
+header small{display:block;color:#343434;font-weight:700;font-size:15px}
+#who{margin-left:auto;background:#fff;border:0;border-left:1px solid #e5e7eb;border-radius:0;padding:8px 18px;font-weight:600}
+main{max-width:1500px;margin:22px auto;padding:0 18px}
+#app>.panel:has(.tabs){display:grid;grid-template-columns:225px minmax(0,1fr);gap:18px;padding:0;background:transparent;border:0;box-shadow:none}
+.tabs{grid-column:1;grid-row:1 / span 10;display:flex;flex-direction:column;gap:7px;padding:12px;background:#fff;border:1px solid #e6e8ec;border-radius:16px;position:sticky;top:14px;height:max-content}
+.tabs button{width:100%;text-align:left;background:transparent;color:#171717;border:0;border-radius:10px;padding:13px 14px;min-height:48px;font-weight:600}
+.tabs button:hover,.tabs button.nav-active{background:#ffd43b;color:#171717;transform:none}
+.tabs button.secondary{background:#fff;color:#333}
+.tabs button.secondary:hover{background:#fff3c2}
+#app>.panel>#home,#app>.panel>#tasks,#app>.panel>#checklist,#app>.panel>#docs,#app>.panel>#employees,#app>.panel>#admin{grid-column:2;grid-row:1;min-width:0;background:transparent;border:0;box-shadow:none;padding:0}
+#app>.panel>#home.hidden,#app>.panel>#tasks.hidden{display:none!important}
+.home-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.home-stat{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid #e3e6eb;border-radius:14px;padding:18px;min-height:118px}
+.home-stat .stat-icon{width:76px;height:76px;display:grid;place-items:center;border-radius:22px;background:#fff1bc;font-size:36px;flex:none}
+.home-stat.green .stat-icon{background:#d9f7e3}.home-stat.red .stat-icon{background:#ffe0e0}
+.home-stat strong{font-size:38px;line-height:1;display:block}.home-stat span{font-size:17px;line-height:1.25}
+.home-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.85fr);gap:16px}
+.home-card{background:#fff;border:1px solid #e3e6eb;border-radius:14px;padding:16px;min-width:0}
+.home-card h2{font-size:22px;border:0;padding:0 0 0 14px;margin:0 0 14px;position:relative;color:#111}
+.home-card h2:before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;border-radius:6px;background:#ffc400}
+.home-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.home-card-head button{width:auto;white-space:nowrap;background:#ffc400;color:#171717;border:0}
+.home-task-table{width:100%;border-collapse:collapse;font-size:15px}
+.home-task-table th{text-align:left;background:#f0f1f3;padding:12px 10px;font-weight:600}
+.home-task-table td{padding:13px 10px;border-bottom:1px solid #e8eaee;vertical-align:middle}
+.home-task-table .task-name{font-weight:600;max-width:290px}
+.home-task-table .due{white-space:nowrap}
+.pill{display:inline-block;border-radius:10px;padding:9px 13px;background:#e9edf2;white-space:nowrap}
+.pill.red{background:#ffe0df;color:#bd1e16}.pill.blue{background:#dceeff;color:#0753a5}.pill.green{background:#dcf7e5;color:#176b3b}
+.home-task-open{width:auto;background:#ffca05;color:#171717;padding:9px 12px}
+.home-lower{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.recent-photos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.recent-photo{min-width:0;text-align:center}
+.recent-photo img{width:100%;height:145px;object-fit:cover;border-radius:9px;border:1px solid #e5e7eb}
+.recent-photo small{display:block;background:#f1f2f4;border-radius:8px;padding:5px;margin-top:4px}
+.news-line{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #eceef1;font-size:14px}
+.news-line:last-child{border-bottom:0}.news-line time{margin-left:auto;color:#707784;white-space:nowrap}
+.mobile-nav{display:none}
+.section-title{display:flex;align-items:center;justify-content:space-between;gap:10px}
+@media(max-width:900px){.home-grid,.home-lower{grid-template-columns:1fr}.home-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){
+ header{min-height:auto;padding:12px 15px;gap:8px;flex-wrap:wrap}
+ header:before{font-size:34px}
+ header h1{font-size:23px}
+ header small{font-size:13px}
+ #who{width:100%;margin:4px 0 0;padding:8px 10px;border:0;background:#fff0a8;border-radius:10px}
+ main{margin:12px auto;padding:0 9px 78px}
+ #app>.panel:has(.tabs){display:flex;flex-direction:column;gap:12px;padding:0}
+ .tabs{display:none}
+ .home-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .home-stat{padding:10px;gap:9px;min-height:92px;border-radius:12px}
+ .home-stat .stat-icon{width:48px;height:48px;border-radius:15px;font-size:24px}
+ .home-stat strong{font-size:28px}.home-stat span{font-size:13px}
+ .home-stat.red{grid-column:1 / -1}
+ .home-card{padding:13px;border-radius:12px}
+ .home-card h2{font-size:19px}
+ .home-grid{grid-template-columns:1fr}
+ .home-task-table th:nth-child(1),.home-task-table td:nth-child(1),.home-task-table th:nth-child(4),.home-task-table td:nth-child(4){display:none}
+ .home-task-table td{padding:10px 6px;font-size:13px}
+ .home-task-table .task-name{max-width:none}
+ .home-task-table .due{white-space:normal}
+ .pill{padding:6px 8px;font-size:12px}
+ .home-task-open{padding:7px 9px;font-size:12px}
+ .recent-photo img{height:112px}
+ .mobile-nav{display:flex;position:fixed;z-index:20;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;justify-content:space-around;padding:7px 4px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -3px 15px #0001}
+ .mobile-nav button{width:auto;flex:1;background:transparent;border:0;color:#303030;padding:5px 2px;margin:0;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px}
+ .mobile-nav button span{font-size:21px}.mobile-nav button.nav-active{color:#c29300;background:#fff7d6}
+}
+
 </style></head>
 <body>
 <header><div><h1>БАЗА</h1><small>ЖК «Олокон» · Инженер ОТ и ТБ</small></div><div id="who"></div></header>
@@ -17,12 +94,54 @@
 <section id="recovery" class="panel hidden"><h2>Восстановление доступа администратора</h2><p class="muted">Введите код SETUP_SECRET из настроек Cloudflare, логин администратора и новый пароль не короче 12 символов. Данные приложения сохраняются.</p><form id="recoveryForm"><input name="setupSecret" type="password" placeholder="Код восстановления SETUP_SECRET" required><input name="username" placeholder="Логин администратора" required><input name="password" type="password" minlength="12" placeholder="Новый пароль (не менее 12 символов)" required><button>Обновить пароль администратора</button></form><p id="recoveryMsg" class="muted"></p><button type="button" class="secondary" onclick="showLogin()">Назад ко входу</button></section>
 <section id="setup" class="panel hidden"><h2>Создать администратора</h2><p class="muted">Однократно. Код настройки задаётся в Cloudflare как SETUP_SECRET.</p><form id="setupForm"><input name="setupSecret" placeholder="Код настройки" required><input name="fullName" placeholder="ФИО администратора" required><input name="username" placeholder="Логин" required><input name="password" type="password" minlength="12" placeholder="Пароль (не менее 12 символов)" required><button>Создать администратора</button></form><p id="setupMsg"></p><button class="secondary" onclick="showLogin()">Назад</button></section>
 <section id="app" class="hidden">
-<div class="panel"><div class="tabs"><button onclick="tab('tasks')">Задания</button><button onclick="tab('checklist')">Ежедневный обход</button><button onclick="tab('docs')">Документы</button><button onclick="tab('employees')">Работники</button><button id="adminTab" class="secondary hidden" onclick="tab('admin')">Администрирование</button><button class="secondary" onclick="logout()">Выйти</button></div>
+<div class="panel"><div class="tabs">
+<button onclick="tab('home')" data-tab="home">⌂　Главная</button>
+<button onclick="tab('tasks')" data-tab="tasks">☑　Мои задания</button>
+<button onclick="tab('checklist')" data-tab="checklist">▦　Ежедневный обход</button>
+<button onclick="tab('photos')" data-tab="photos">▣　Фото</button>
+<button onclick="tab('docs')" data-tab="docs">▤　Документы</button>
+<button onclick="tab('employees')" data-tab="employees">♟　Работники</button>
+<button id="adminTab" class="secondary hidden" onclick="tab('admin')" data-tab="admin">⚙　Администрирование</button>
+<button class="secondary" onclick="logout()">↪　Выйти</button>
+</div>
+<div id="home">
+<div class="home-stats">
+<div class="home-stat"><div class="stat-icon">📋</div><div><strong id="homeMyTasks">0</strong><span>Мои задания</span></div></div>
+<div class="home-stat green"><div class="stat-icon">🛡️</div><div><strong id="homeDone">0</strong><span>Выполнено за месяц</span></div></div>
+<div class="home-stat red"><div class="stat-icon">❗</div><div><strong id="homeOverdue">0</strong><span>Просрочено</span></div></div>
+</div>
+<div class="home-grid">
+<section class="home-card">
+<div class="home-card-head"><h2>Мои задания</h2><button onclick="tab('tasks')">Найти　⌕</button></div>
+<div style="overflow-x:auto"><table class="home-task-table"><thead><tr><th>№</th><th>Задание</th><th>Срок</th><th>Статус</th><th>Действия</th></tr></thead><tbody id="homeTaskRows"><tr><td colspan="5" class="muted">Загрузка…</td></tr></tbody></table></div>
+</section>
+<section class="home-card">
+<h2>Последние фото</h2><div id="homePhotos" class="recent-photos"><p class="muted">Загрузка фотографий…</p></div>
+<div style="text-align:right;margin-top:10px"><button onclick="tab('photos')">Все фото　→</button></div>
+</section>
+</div>
+<div class="home-lower">
+<section class="home-card"><h2>Свежие новости</h2><div id="homeNews"><div class="news-line">📢　Добро пожаловать в рабочую базу ЖК «Олокон»</div></div></section>
+<section class="home-card"><h2>Ежедневный обход</h2><div id="homeChecklistSummary" class="muted">Загрузка сводки обхода…</div><button onclick="tab('checklist')">Открыть обход　→</button></section>
+</div>
+</div>
 <div id="tasks"><h2>Задания для устранения</h2><form id="taskForm"><input name="title" placeholder="Название задания" required><textarea name="description" placeholder="Описание нарушения и необходимые меры"></textarea><div class="row"><input name="dueDate" type="date"><input name="assignedTo" type="number" placeholder="ID исполнителя"></div><button>Создать задание</button></form><div class="task-filters"><button type="button" id="allTasksBtn" class="secondary active" onclick="filterTasks(&quot;all&quot;)">Все задания <span id="allTasksCount">0</span></button><button type="button" id="overdueTasksBtn" class="secondary" onclick="filterTasks(&quot;overdue&quot;)">Просрочено <span id="overdueCount">0</span></button><button type="button" id="progressTasksBtn" class="secondary" onclick="filterTasks(&quot;В работе&quot;)">В работе <span id="progressTasksCount">0</span></button><button type="button" id="reviewTasksBtn" class="secondary" onclick="filterTasks(&quot;На проверке&quot;)">На проверке <span id="reviewTasksCount">0</span></button><button type="button" id="doneTasksBtn" class="secondary" onclick="filterTasks(&quot;Выполнено&quot;)">Выполнено <span id="doneTasksCount">0</span></button></div><div id="taskList"></div></div>
 <div id="checklist" class="hidden"><h2>Чек-лист ежедневного обхода</h2><input id="checkDate" type="date"><div id="checkList"></div></div>
 <div id="employees" class="hidden"><h2>Работники</h2><div class="row"><button type="button" id="allEmployeesMode" onclick="setEmployeeMode(&quot;all&quot;)">Все работники</button><button type="button" id="slingersMode" class="secondary" onclick="setEmployeeMode(&quot;slingers&quot;)">Стропальщики</button></div><input id="employeeSearch" type="search" placeholder="Поиск по ФИО: все работники и стропальщики"><button type="button" onclick="loadEmployees()">Найти</button><p class="muted">Общий поиск: показывает совпадения и среди всех работников, и среди стропальщиков — независимо от выбранной вкладки.</p><div id="employeeCount" class="muted">Найдено работников: 0</div><div id="slingerExpiryFilters" class="task-filters hidden"><button type="button" id="allSlingersBtn" class="secondary active" onclick="setSlingerExpiryFilter('all')">Все стропальщики</button><button type="button" id="overdueSlingersBtn" class="secondary" onclick="setSlingerExpiryFilter('overdue')">Просрочено <span id="overdueSlingersCount">0</span></button></div><div id="employeeList"></div><div id="employeeImport" class="item hidden"><h3>Загрузить / обновить общую базу работников</h3><p class="muted">Импортируется лист «ВВодный 2025-2026». Этот раздел обновляет общую базу работников.</p><input id="employeeExcel" type="file" accept=".xlsx,.xls"><button id="employeeUpload" type="button" onclick="uploadEmployees()">Загрузить и опубликовать общую базу</button><div id="employeeUploadMsg" class="muted"></div></div><div id="slingerImport" class="item hidden"><h3>Отдельная загрузка данных стропальщиков</h3><p class="muted">Загрузите Excel со списком стропальщиков. Существующие записи обновятся по ФИО, новые добавятся. Остальные данные работников не изменяются, отсутствующие в файле записи не удаляются.</p><label for="slingerExpiryColumn" class="muted">В каком столбце находится дата окончания удостоверения?</label><select id="slingerExpiryColumn"><option value="">Выберите столбец с датой окончания</option><option value="3">Столбец D</option><option value="4">Столбец E</option></select><input id="slingerExcel" type="file" accept=".xlsx,.xls"><button id="slingerUpload" type="button" onclick="uploadSlingers()">Загрузить / обновить только стропальщиков</button><div id="slingerUploadMsg" class="muted"></div></div></div><div id="docs" class="hidden"><h2>Документы инженера</h2><form id="docForm"><input name="title" placeholder="Название документа"><input name="file" type="file" required><button>Загрузить документ (до 15 МБ)</button></form><div id="docList"></div></div>
 <div id="admin" class="hidden"><h2>Администрирование</h2><h3>Пользователи</h3><form id="userForm"><input name="fullName" placeholder="ФИО инженера" required><input name="username" placeholder="Логин" required><input name="password" type="password" minlength="12" placeholder="Пароль от 12 символов" required><select name="role"><option value="engineer">Инженер ОТ и ТБ</option><option value="admin">Администратор</option></select><button>Создать пользователя</button></form><div id="userList"></div><h3>История действий с доступом</h3><div id="accessAudit" class="muted">Загрузка истории…</div><h3>Пункты чек-листа</h3><form id="checkItemForm"><h4>Добавить отдельную строку обхода</h4><input name="category" list="checkCategories" placeholder="Блок: например Электробезопасность" required><datalist id="checkCategories"><option>Общие требования</option><option>Средства индивидуальной защиты</option><option>Электробезопасность</option><option>Пожарная безопасность</option><option>Работы на высоте и леса</option><option>Порядок и санитария</option><option>Строительная техника и механизмы</option><option>Складирование материалов</option><option>Земляные работы</option><option>Лифты и эскалаторы</option><option>Горячие работы</option><option>Первая помощь и аптечки</option></datalist><input name="title" placeholder="Конкретный пункт проверки / возможное нарушение" required><button>Добавить строку в обход</button></form><p class="muted">Каждая строка добавляется отдельно. Инженер отмечает: выполнено, нарушение или не применимо, и оставляет комментарий.</p></div>
-</div></section>
+</div>
+<div id="photos" class="hidden">
+<h2>Фотоотчёты по заданиям</h2><p class="muted">Фотографии до и после устранения нарушений, загруженные в отчёты по заданиям.</p>
+<div id="allPhotosList"></div>
+</div>
+</section>
+<nav class="mobile-nav">
+<button onclick="tab('home')" data-tab="home"><span>⌂</span>Главная</button>
+<button onclick="tab('tasks')" data-tab="tasks"><span>☑</span>Задания</button>
+<button onclick="tab('photos')" data-tab="photos"><span>▣</span>Фото</button>
+<button onclick="tab('docs')" data-tab="docs"><span>▤</span>Документы</button>
+<button onclick="tab('more')" data-tab="more"><span>•••</span>Ещё</button>
+</nav>
 <p class="muted">Доступ к документам осуществляется через авторизацию. Не размещайте секреты и пароли в публичных файлах.</p>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -33,7 +152,7 @@ function showLogin(){$('#login').classList.remove('hidden');$('#setup').classLis
 function showRecovery(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#recovery').classList.remove('hidden')}
 function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.remove('hidden')}
 function showApp(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':'Инженер ОТ и ТБ');$('#adminTab').classList.toggle('hidden',me.role!=='admin');tab('tasks');loadAll()}
-function tab(name){['tasks','checklist','docs','admin','employees'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));if(name==='employees'){const admin=me.role==='admin';$('#employeeImport').classList.toggle('hidden',!admin||employeeFilter==='slingers');$('#slingerImport').classList.toggle('hidden',!admin||employeeFilter!=='slingers');resetEmployeeResults()}}
+function tab(name){if(name==='more'){name='checklist'}['home','tasks','checklist','docs','admin','employees','photos'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('nav-active',b.dataset.tab===name));if(name==='employees'){const admin=me.role==='admin';$('#employeeImport').classList.toggle('hidden',!admin||employeeFilter==='slingers');$('#slingerImport').classList.toggle('hidden',!admin||employeeFilter!=='slingers');resetEmployeeResults()}if(name==='photos')loadAllPhotos();if(name==='home')renderHome()}
 function msg(id,t,cls=''){const e=$(id);e.textContent=t;e.className=cls}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),btn=e.target.querySelector('button');btn.disabled=true;msg('#loginMsg','Проверяем данные…','muted');try{await api('/login',{method:'POST',body:JSON.stringify(b)});await init()}catch(x){showLogin();msg('#loginMsg',x.message||'Не удалось войти. Проверьте настройки сессии Worker.','error')}finally{btn.disabled=false}};
 $('#setupForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/setup',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});msg('#setupMsg','Администратор создан. Теперь войдите.','success');showLogin()}catch(x){msg('#setupMsg',x.message,'error')}};
@@ -45,7 +164,7 @@ function formatExpiryDate(v){if(!v)return '—';const m=String(v).slice(0,10).ma
 function slingerExpiryHtml(e){const date=String(e.slinger_expiry_date||'').slice(0,10);if(!e.slinger_certificate&&!date)return '';if(!date)return '<div style="margin-top:8px"><b>Удостоверение стропальщика — срок действия:</b> <span class="status warning">дата не указана в Excel</span></div>';const today=new Date(localDate()+'T00:00:00'),expiry=new Date(date+'T00:00:00'),days=Math.ceil((expiry-today)/86400000),cls=days<0?'overdue':days<=30?'warning':'valid',label=days<0?'ПРОСРОЧЕНО':days===0?'ИСТЕКАЕТ СЕГОДНЯ':days<=30?'СКОРО ИСТЕКАЕТ':'ДЕЙСТВУЕТ';return '<div style="margin-top:8px;padding:9px 10px;border-radius:8px;background:'+(days<0?'#fff0ef':days<=30?'#fff7e8':'#eef8f1')+'"><b>Удостоверение стропальщика действительно до: '+esc(formatExpiryDate(date))+'</b> <span class="status '+cls+'">'+label+'</span></div>'}
 function isOverdue(t){return !!t.due_date&&t.due_date.slice(0,10)<localDate()&&t.status!=='Выполнено'}
 function filterTasks(mode){taskFilter=mode;[["allTasksBtn","all"],["overdueTasksBtn","overdue"],["progressTasksBtn","В работе"],["reviewTasksBtn","На проверке"],["doneTasksBtn","Выполнено"]].forEach(([id,value])=>$("#"+id).classList.toggle("active",mode===value));renderTasks()}
-function renderTasks(){const tasks=taskFilter==="all"?allTasks:taskFilter==="overdue"?allTasks.filter(isOverdue):allTasks.filter(t=>t.status===taskFilter);$("#allTasksCount").textContent=allTasks.length;$("#overdueCount").textContent=allTasks.filter(isOverdue).length;$("#progressTasksCount").textContent=allTasks.filter(t=>t.status==="В работе").length;$("#reviewTasksCount").textContent=allTasks.filter(t=>t.status==="На проверке").length;$("#doneTasksCount").textContent=allTasks.filter(t=>t.status==="Выполнено").length;$('#taskList').innerHTML=tasks.map(t=>'<div class="item"><b>'+esc(t.title)+'</b> <span class="status">'+esc(t.status)+'</span> '+(isOverdue(t)?'<span class="status overdue">Просрочено</span>':'')+'<p>'+esc(t.description||'')+'</p><small>Назначен: '+esc(t.assigned_name||'не назначен')+' · Срок: '+esc(t.due_date||'не указан')+'</small>'+ (t.status==='В работе'?'<p class="muted"><b>В работе:</b> '+esc(t.in_progress_by_name||t.assigned_name||'не указан')+'</p>':'')+(t.status==='На проверке'?'<p class="muted"><b>На проверку отправил:</b> '+esc(t.review_by_name||t.assigned_name||'не указан')+'</p>':'')+(t.status==='Выполнено'?'<p class="muted"><b>Выполнил:</b> '+esc(t.completed_by_name||t.assigned_name||'не указан')+'</p>':'')+'<div class="row"><select id="s'+t.id+'"><option>Новая</option><option>В работе</option><option>На проверке</option><option>Выполнено</option></select><button onclick="setStatus('+t.id+')">Обновить статус</button>'+(me.role==='admin'?'<button class="danger" onclick="deleteTask('+t.id+')">Удалить задание</button>':'')+'</div><button type="button" class="secondary" onclick="openReport('+t.id+')">Фото / видео отчёт</button><div id="report'+t.id+'" class="hidden"></div></div>').join('')||(taskFilter==='overdue'?'<p class="muted">Просроченных заданий нет.</p>':'<p class="muted">Заданий пока нет.</p>');tasks.forEach(t=>{const s=$('#s'+t.id);if(s)s.value=t.status})}
+function renderTasks(){renderHome();const tasks=taskFilter==="all"?allTasks:taskFilter==="overdue"?allTasks.filter(isOverdue):allTasks.filter(t=>t.status===taskFilter);$("#allTasksCount").textContent=allTasks.length;$("#overdueCount").textContent=allTasks.filter(isOverdue).length;$("#progressTasksCount").textContent=allTasks.filter(t=>t.status==="В работе").length;$("#reviewTasksCount").textContent=allTasks.filter(t=>t.status==="На проверке").length;$("#doneTasksCount").textContent=allTasks.filter(t=>t.status==="Выполнено").length;$('#taskList').innerHTML=tasks.map(t=>'<div class="item"><b>'+esc(t.title)+'</b> <span class="status">'+esc(t.status)+'</span> '+(isOverdue(t)?'<span class="status overdue">Просрочено</span>':'')+'<p>'+esc(t.description||'')+'</p><small>Назначен: '+esc(t.assigned_name||'не назначен')+' · Срок: '+esc(t.due_date||'не указан')+'</small>'+ (t.status==='В работе'?'<p class="muted"><b>В работе:</b> '+esc(t.in_progress_by_name||t.assigned_name||'не указан')+'</p>':'')+(t.status==='На проверке'?'<p class="muted"><b>На проверку отправил:</b> '+esc(t.review_by_name||t.assigned_name||'не указан')+'</p>':'')+(t.status==='Выполнено'?'<p class="muted"><b>Выполнил:</b> '+esc(t.completed_by_name||t.assigned_name||'не указан')+'</p>':'')+'<div class="row"><select id="s'+t.id+'"><option>Новая</option><option>В работе</option><option>На проверке</option><option>Выполнено</option></select><button onclick="setStatus('+t.id+')">Обновить статус</button>'+(me.role==='admin'?'<button class="danger" onclick="deleteTask('+t.id+')">Удалить задание</button>':'')+'</div><button type="button" class="secondary" onclick="openReport('+t.id+')">Фото / видео отчёт</button><div id="report'+t.id+'" class="hidden"></div></div>').join('')||(taskFilter==='overdue'?'<p class="muted">Просроченных заданий нет.</p>':'<p class="muted">Заданий пока нет.</p>');tasks.forEach(t=>{const s=$('#s'+t.id);if(s)s.value=t.status})}
 async function loadTasks(){const d=await api('/tasks');allTasks=d.tasks||[];renderTasks()}
 async function openReport(id){
  const box=$('#report'+id);box.classList.toggle('hidden');if(box.dataset.loaded==='1')return;
@@ -214,7 +333,24 @@ async function uploadSlingers(){
  }catch(e){$('#slingerUploadMsg').textContent='Ошибка загрузки: '+e.message}
  finally{btn.disabled=false}
 }
-async function loadAll(){try{await Promise.all([loadTasks(),loadChecklist(),loadDocs(),loadAdmin()])}catch(e){console.error(e)}}
+async function renderHome(){
+ const mine=me?.role==='responsible'?allTasks.filter(t=>Number(t.assigned_to)===Number(me.id)):allTasks;
+ const done=mine.filter(t=>t.status==='Выполнено');
+ const month=new Date();const doneMonth=done.filter(t=>{const d=new Date(t.updated_at||t.completed_at||t.created_at||0);return d.getMonth()===month.getMonth()&&d.getFullYear()===month.getFullYear()});
+ $('#homeMyTasks').textContent=mine.length;$('#homeDone').textContent=doneMonth.length;$('#homeOverdue').textContent=mine.filter(isOverdue).length;
+ const rows=mine.slice().sort((a,b)=>(isOverdue(a)?-1:0)-(isOverdue(b)?-1:0)).slice(0,5);
+ $('#homeTaskRows').innerHTML=rows.map((t,i)=>'<tr><td>'+(i+1)+'</td><td class="task-name">'+esc(t.title)+'</td><td class="due">'+esc(t.due_date||'—')+(isOverdue(t)?'<br><small style="color:#c21d16">Просрочено</small>':'')+'</td><td><span class="pill '+(isOverdue(t)?'red':t.status==='Выполнено'?'green':t.status==='В работе'?'blue':'')+'">'+esc(isOverdue(t)?'Просрочено':t.status)+'</span></td><td><button class="home-task-open" onclick="tab('tasks')">Открыть</button></td></tr>').join('')||'<tr><td colspan="5" class="muted">Заданий пока нет.</td></tr>';
+ const check=$('#homeChecklistSummary');if(check){try{const d=await api('/checklist?date='+localDate());const arr=d.items||[];const marked=arr.filter(x=>x.result);const violations=arr.filter(x=>x.result==='Нарушение');check.innerHTML='<b>'+marked.length+' из '+arr.length+'</b> пунктов отмечено<br><span style="color:'+(violations.length?'#b32620':'#177245')+'">Нарушений: '+violations.length+'</span>'}catch(e){check.textContent='Сводка обхода временно недоступна'}}
+}
+async function loadAllPhotos(){
+ const box=$('#allPhotosList');if(!box)return;box.innerHTML='<p class="muted">Загружаем фотографии…</p>';
+ try{const tasks=allTasks.slice().sort((a,b)=>Number(b.id)-Number(a.id));const reports=await Promise.all(tasks.slice(0,15).map(async t=>{try{return {task:t,data:await api('/tasks/'+t.id+'/report')}}catch(e){return null}}));
+ const items=[];reports.filter(Boolean).forEach(r=>(r.data.photos||[]).forEach(p=>items.push({task:r.task,photo:p})));
+ box.innerHTML=items.length?'<div class="home-lower">'+items.slice(0,30).map(x=>'<div class="home-card"><b>'+esc(x.task.title)+'</b><div class="muted">'+(x.photo.photo_type==='before'?'До устранения':'После устранения')+'</div><a href="'+x.photo.url+'" target="_blank"><img src="'+x.photo.url+'" class="photo" style="max-width:100%;height:190px"></a></div>').join('')+'</div>':'<p class="muted">Фотографии появятся здесь после загрузки фотоотчётов к заданиям.</p>';
+ const preview=items.slice(0,2);$('#homePhotos').innerHTML=preview.length?preview.map(x=>'<div class="recent-photo"><a href="'+x.photo.url+'" target="_blank"><img src="'+x.photo.url+'"></a><small>'+(x.photo.photo_type==='before'?'До':'После')+'</small></div>').join(''):'<p class="muted">Фото появятся после загрузки отчётов.</p>';
+ }catch(e){box.innerHTML='<p class="error">Не удалось загрузить фото: '+esc(e.message)+'</p>'}
+}
+async function loadAll(){try{await Promise.all([loadTasks(),loadChecklist(),loadDocs(),loadAdmin()]);await renderHome();await loadAllPhotos()}catch(e){console.error(e)}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function init(){const d=await api('/me');me=d.user;showApp()}
 init().catch(()=>showLogin());
