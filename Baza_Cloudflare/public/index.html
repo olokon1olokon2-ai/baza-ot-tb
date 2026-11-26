@@ -362,13 +362,13 @@ async function loadViolationPhotos(){
  box.innerHTML='<p class="muted">Загружаем фотографии…</p>';
  try{
   const d=await api('/violation-photos');
-  const photos=d.photos||[];
-  box.innerHTML=photos.length?photos.map(p=>'<article class="item">'+
-   '<div class="row"><b>'+esc(p.uploader_name||'Ответственный сотрудник')+'</b><span class="status '+(p.status==='Принято'?'valid':'warning')+'">'+esc(p.status)+'</span></div>'+
-   '<p class="muted">'+esc(p.created_at||'')+' · '+esc(p.original_name||'Фото')+'</p>'+
-   (p.description?'<p>'+esc(p.description)+'</p>':'')+
-   '<a href="'+p.url+'" target="_blank"><img src="'+p.url+'" alt="Фото нарушения" class="photo" style="max-width:100%;max-height:420px;object-fit:contain"></a>'+
-   (me.role==='admin'&&p.status==='На проверке'?'<div class="actions"><button onclick="reviewViolationPhoto('+p.id+',\'approve\')">Принять</button><button class="danger" onclick="reviewViolationPhoto('+p.id+',\'reject\')">Отклонить</button></div>':'')+
+  const submissions=d.submissions||[];
+  box.innerHTML=submissions.length?submissions.map(s=>'<article class="item">'+
+   '<div class="row"><b>'+esc(s.uploader_name||'Ответственный сотрудник')+'</b><span class="status '+(s.status==='Принято'?'valid':'warning')+'">'+esc(s.status)+'</span></div>'+
+   '<p class="muted">'+esc(s.created_at||'')+'</p>'+
+   (s.description?'<p>'+esc(s.description)+'</p>':'')+
+   '<div class="home-lower">'+s.photos.map(p=>'<a href="'+p.url+'" target="_blank"><img src="'+p.url+'" alt="Фото нарушения" class="photo" style="max-width:100%;max-height:320px;object-fit:contain"><small>'+esc(p.original_name||'Фото')+'</small></a>').join('')+'</div>'+
+   (me.role==='admin'&&s.status==='На проверке'?'<div class="actions"><button onclick="reviewViolationPhoto(\\''+s.id+'\\',\\'approve\\')">Принять все фото</button><button class="danger" onclick="reviewViolationPhoto(\\''+s.id+'\\',\\'reject\\')">Отклонить и удалить все</button></div>':'')+
    '</article>').join(''):'<p class="muted">Фотографий пока нет.</p>';
  }catch(e){box.innerHTML='<p class="error">'+esc(e.message)+'</p>'}
 }
@@ -383,7 +383,7 @@ $('#violationPhotoForm').onsubmit=async e=>{
  }catch(x){alert(x.message)}finally{button.disabled=false}
 };
 async function reviewViolationPhoto(id,action){
- const promptText=action==='approve'?'Принять эту фотографию? При принятии она останется в разделе.':'Отклонить фотографию? Она будет полностью удалена вместе с файлом.';
+ const promptText=action==='approve'?'Принять все фотографии этой отправки?':'Отклонить отправку? Все фотографии и файлы будут полностью удалены.';
  if(!confirm(promptText))return;
  try{await api('/violation-photos/'+id,{method:'PATCH',body:JSON.stringify({action})});await loadViolationPhotos()}
  catch(e){alert(e.message)}
