@@ -289,17 +289,29 @@ function resetEmployeeResults(){
 function setEmployeeMode(mode){employeeFilter=mode;slingerExpiryFilter='all';$('#slingerExpiryFilters').classList.toggle('hidden',mode!=='slingers');$('#employeeSearch').value='';const admin=me&&me.role==='admin';$('#employeeImport').classList.toggle('hidden',!admin||mode==='slingers');$('#slingerImport').classList.toggle('hidden',!admin||mode!=='slingers');resetEmployeeResults()}
 function toggleEmployeeDetails(i){const el=$('#employeeDetails'+i);if(el)el.classList.toggle('hidden')}
 function setSlingerExpiryFilter(mode){slingerExpiryFilter=mode;$('#allSlingersBtn').classList.toggle('active',mode==='all');$('#overdueSlingersBtn').classList.toggle('active',mode==='overdue');loadEmployees()}
+function normalizeEmployeeSearch(value){
+ return String(value??'').toLocaleLowerCase('ru')
+  .replace(/ё/g,'е')
+  .normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')
+  .replace(/[\\s\\p{P}\\p{S}_]+/gu,'');
+}
 async function loadEmployees(){
  const q=$('#employeeSearch').value.trim();
+ const normalizedQuery=normalizeEmployeeSearch(q);
  try{
   let employees=[],total=0;
-  if(q){
-   // Общий поиск всегда ищет одновременно в обычных работниках и в отдельном списке стропальщиков.
+  if(normalizedQuery){
+   // Загружаем обе части общей базы и сравниваем нормализованный текст:
+   // регистр, пробелы, точки, дефисы и буквы Ё/Е не влияют на поиск.
    const [regular,sl] = await Promise.all([
-    api('/employees?'+new URLSearchParams({q}).toString()),
-    api('/employees?'+new URLSearchParams({q,slingers:'1'}).toString())
+    api('/employees'),
+    api('/employees?slingers=1')
    ]);
-   employees=[...(regular.employees||[]),...(sl.employees||[])];
+   const all=[...(regular.employees||[]),...(sl.employees||[])];
+   employees=all.filter(e=>{
+    const searchable=normalizeEmployeeSearch([e.employee_name,e.position,e.employer].filter(Boolean).join(' '));
+    return searchable.includes(normalizedQuery);
+   });
    total=employees.length;
   }else{
    const params=new URLSearchParams();
