@@ -302,7 +302,7 @@ async function api(request, env) {
       throw error;
     }
   }
-  const userRoleMatch=path.match(/^\/api\/users\/(\\d+)\\/role$/);
+  const userRoleMatch=path.match(/^\/api\/users\/(\d+)\/role$/);
   if(userRoleMatch && method==="PATCH") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
     const id=Number(userRoleMatch[1]), body=await request.json();
