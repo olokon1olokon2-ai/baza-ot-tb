@@ -179,19 +179,17 @@ async function api(request, env) {
   if(path==="/api/me" && method==="GET") return json({user});
 
   if(path==="/api/employees" && method==="GET") {
-    const q=(url.searchParams.get("q")||"").trim();
     const slingers=url.searchParams.get("slingers")==="1";
+    const limit=Math.min(1000,Math.max(1,Number(url.searchParams.get("limit"))||1000));
+    const offset=Math.max(0,Number(url.searchParams.get("offset"))||0);
     const state=await env.DB.prepare("SELECT active_batch_id FROM employee_import_state WHERE id=1").first();
-    if(!state?.active_batch_id) return json({employees:[],total:0});
-    let sql="SELECT e.id,e.employee_name,e.position,e.employer,e.instruction_date,e.form_o86_value,e.form_086_value,e.has_medical_certificate,e.slinger_certificate,e.slinger_expiry_date FROM employees e WHERE e.batch_id=?";
-    const args=[state.active_batch_id];
-    if(q){sql+=" AND LOWER(e.employee_name) LIKE LOWER(?)";args.push("%"+q+"%");}
+    if(!state?.active_batch_id) return json({employees:[],total:0,limit,offset});
     const slingerPosition="LOWER(TRIM(COALESCE(e.position,''))) LIKE '%стропальщик%'";
-    if(slingers) sql+=" AND "+slingerPosition;
-    else sql+=" AND NOT ("+slingerPosition+")";
-    sql+=" ORDER BY employee_name LIMIT 1000";
-    const rows=await env.DB.prepare(sql).bind(...args).all();
-    return json({employees:rows.results,total:rows.results.length});
+    const condition=slingers?" AND "+slingerPosition:" AND NOT ("+slingerPosition+")";
+    const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM employees e WHERE e.batch_id=?"+condition).bind(state.active_batch_id).first();
+    const rows=await env.DB.prepare("SELECT e.id,e.employee_name,e.position,e.employer,e.instruction_date,e.form_o86_value,e.form_086_value,e.has_medical_certificate,e.slinger_certificate,e.slinger_expiry_date FROM employees e WHERE e.batch_id=?"+condition+" ORDER BY e.employee_name,e.id LIMIT ? OFFSET ?")
+      .bind(state.active_batch_id,limit,offset).all();
+    return json({employees:rows.results,total:Number(count?.total||0),limit,offset});
   }
   if(path==="/api/employees/import" && method==="POST") {
     if(!adminOnly(user)) return json({error:"Только администратор может загружать базу работников"},403);
