@@ -48,7 +48,12 @@ const adminOnly = user => user.role === "admin";
 async function getTaskAccess(env,user,id) {
   const task=await env.DB.prepare("SELECT * FROM tasks WHERE id=?").bind(id).first();
   if(!task) return {error:json({error:"Задание не найдено"},404)};
-  if(user.role!=="admin" && task.assigned_to!==user.id && task.created_by!==user.id) return {error:json({error:"Нет доступа к заданию"},403)};
+  // Администратор и инженеры ОТ и ТБ имеют доступ ко всем заданиям,
+  // включая фото и видео отчёты, независимо от организации.
+  // Ответственные сотрудники имеют доступ только к назначенным им заданиям.
+  const allowed = user.role === "admin" || user.role === "engineer" ||
+    (user.role === "responsible" && Number(task.assigned_to) === Number(user.id));
+  if(!allowed) return {error:json({error:"Нет доступа к заданию"},403)};
   return {task};
 }
 async function api(request, env) {
