@@ -609,29 +609,21 @@ async function api(request, env) {
 
   // Фотоотчёты инженеров с проверкой администратором
   if (path === "/api/photo-reports" && method === "GET") {
-    if (user.role === "responsible") return json({ error: "Нет доступа к разделу Фото" }, 403);
-    const sql = `SELECT p.id,p.engineer_id,p.organization_id,p.description,p.status,p.review_comment,p.created_at,p.reviewed_at,u.full_name AS engineer_name,o.name AS organization_name,r.full_name AS reviewer_name FROM photo_reports p JOIN users u ON u.id=p.engineer_id LEFT JOIN organizations o ON o.id=p.organization_id LEFT JOIN users r ON r.id=p.reviewed_by `;
-    const rows = user.role === "admin"
-      ? await env.DB.prepare(sql + " ORDER BY CASE p.status WHEN 'На проверке' THEN 0 WHEN 'Отклонено' THEN 1 ELSE 2 END,p.created_at DESC").all()
-      : await env.DB.prepare(sql + " WHERE p.engineer_id=? ORDER BY p.created_at DESC").bind(user.id).all();
+    if (user.role !== "admin" && user.role !== "responsible") return json({ error: "Раздел Фото доступен только администратору и ответственным сотрудникам" }, 403);
+    const sql = `SELECT p.id,p.engineer_id,p.organization_id,p.status,p.created_at,p.reviewed_at,u.full_name AS engineer_name,o.name AS organization_name,r.full_name AS reviewer_name FROM photo_reports p JOIN users u ON u.id=p.engineer_id LEFT JOIN organizations o ON o.id=p.organization_id LEFT JOIN users r ON r.id=p.reviewed_by `;
+    const rows = await env.DB.prepare(sql + " ORDER BY CASE p.status WHEN 'На проверке' THEN 0 ELSE 1 END,p.created_at DESC").all();
     return json({ reports: rows.results });
   }
 
   if (path === "/api/photo-reports" && method === "POST") {
-    if (user.role !== "engineer") return json({ error: "Фотоотчёт отправляет ответственный инженер" }, 403);
-    if (Number(user.can_submit_photo_reports) !== 1) {
-      return json({ error: "Администратор ещё не выдал вам право на отправку фотоотчётов" }, 403);
-    }
     const form = await request.formData();
     const file = form.get("file");
-    const description = String(form.get("description") || "").trim();
     if (!(file instanceof File) || !file.size || file.size > 8 * 1024 * 1024) return json({ error: "Выберите фотографию размером не более 8 МБ" }, 400);
     if (!file.type.startsWith("image/")) return json({ error: "Можно отправлять только фотографии" }, 400);
-    if (!description) return json({ error: "Добавьте описание фотографии" }, 400);
     if (!env.FILES) return json({ error: "Хранилище фотографий не подключено" }, 500);
     const key = "photo-reports/" + user.id + "/" + crypto.randomUUID();
     await env.FILES.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
-    const r = await env.DB.prepare("INSERT INTO photo_reports(engineer_id,organization_id,description,file_key,content_type) VALUES(?,?,?,?,?)").bind(user.id,user.organization_id,description,key,file.type).run();
+    const r = await env.DB.prepare("INSERT INTO photo_reports(engineer_id,organization_id,description,file_key,content_type) VALUES(?,?,?,?,?)").bind(user.id,user.organization_id,"",key,file.type).run();
     return json({ ok: true, id: r.meta.last_row_id });
   }
 
@@ -639,7 +631,7 @@ async function api(request, env) {
   if (reportFileMatch && method === "GET") {
     const report = await env.DB.prepare("SELECT * FROM photo_reports WHERE id=?").bind(Number(reportFileMatch[1])).first();
     if (!report) return json({ error: "Фотоотчёт не найден" }, 404);
-    if (user.role !== "admin" && report.engineer_id !== user.id) return json({ error: "Нет доступа к этой фотографии" }, 403);
+    if (user.role !== "admin" && user.role !== "responsible") return json({ error: "Просматривать Фото могут только администратор и ответственные сотрудники" }, 403);
     const object = await env.FILES.get(report.file_key);
     if (!object) return json({ error: "Файл отсутствует в хранилище" }, 404);
     return new Response(object.body, { headers: { "content-type": report.content_type, "cache-control": "private, no-store" } });
@@ -658,18 +650,19 @@ async function api(request, env) {
 
   const reportActionMatch = path.match(/^\/api\/photo-reports\/(\d+)$/);
   if (reportActionMatch && method === "PATCH") {
-    if (!adminOnly(user)) return json({ error: "Подтвердить или отклонить фото может только администратор" }, 403);
+    if (user.role !== "admin" && user.role !== "responsible") return json({ error: "Проверять Фото могут только администратор и ответственные сотрудники" }, 403);
     const body = await request.json(); const id = Number(reportActionMatch[1]);
     const report = await env.DB.prepare("SELECT * FROM photo_reports WHERE id=?").bind(id).first();
-    if (!report) return json({ error: "Фотоотчёт не найден" }, 404);
-    if (report.status !== "На проверке") return json({ error: "Этот фотоотчёт уже проверен" }, 400);
+    if (!report) return json({ error: "Фото не найдено" }, 404);
+    if (report.status !== "На проверке") return json({ error: "Это фото уже проверено" }, 400);
     if (body.action === "approve") {
       await env.DB.prepare("UPDATE photo_reports SET status='Подтверждено',reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP,review_comment='' WHERE id=?").bind(user.id,id).run();
       return json({ ok: true });
     }
     if (body.action === "reject") {
-      await env.DB.prepare("UPDATE photo_reports SET status='Отклонено',reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP,review_comment='' WHERE id=?").bind(user.id,id).run();
-      return json({ ok: true });
+      if (env.FILES && report.file_key) await env.FILES.delete(report.file_key);
+      await env.DB.prepare("DELETE FROM photo_reports WHERE id=?").bind(id).run();
+      return json({ ok: true, deleted: true });
     }
     return json({ error: "Неизвестное действие" }, 400);
   }
