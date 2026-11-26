@@ -295,35 +295,43 @@ function normalizeEmployeeSearch(value){
   .normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')
   .replace(/[\\s\\p{P}\\p{S}_]+/gu,'');
 }
+async function fetchAllEmployeePages(slingers){
+ const limit=1000,first=await api('/employees?slingers='+(slingers?'1':'0')+'&limit='+limit+'&offset=0');
+ const employees=[...(first.employees||[])],total=Number(first.total||0);
+ const offsets=[];for(let offset=limit;offset<total;offset+=limit)offsets.push(offset);
+ const pages=await Promise.all(offsets.map(offset=>api('/employees?slingers='+(slingers?'1':'0')+'&limit='+limit+'&offset='+offset)));
+ for(const page of pages)employees.push(...(page.employees||[]));
+ return employees;
+}
 async function loadEmployees(){
  const q=$('#employeeSearch').value.trim();
  const normalizedQuery=normalizeEmployeeSearch(q);
  try{
-  let employees=[],total=0;
+  let employees=[];
   if(normalizedQuery){
-   // Загружаем обе части общей базы и сравниваем нормализованный текст:
-   // регистр, пробелы, точки, дефисы и буквы Ё/Е не влияют на поиск.
-   const [regular,sl] = await Promise.all([
-    api('/employees'),
-    api('/employees?slingers=1')
-   ]);
-   const all=[...(regular.employees||[]),...(sl.employees||[])];
-   employees=all.filter(e=>{
+   // Загружаем ВСЕ страницы обеих частей базы, затем ищем без учёта регистра,
+   // пробелов, знаков препинания и различия Ё/Е.
+   const [regular,sl]=await Promise.all([fetchAllEmployeePages(false),fetchAllEmployeePages(true)]);
+   const unique=new Map([...regular,...sl].map(e=>[String(e.id),e]));
+   employees=[...unique.values()].filter(e=>{
     const searchable=normalizeEmployeeSearch([e.employee_name,e.position,e.employer].filter(Boolean).join(' '));
     return searchable.includes(normalizedQuery);
    });
-   total=employees.length;
   }else{
-   const params=new URLSearchParams();
-   if(employeeFilter==='slingers')params.set('slingers','1');
-   const d=await api('/employees?'+params.toString());
-   employees=d.employees||[];
-   total=d.total||0;
+   employees=await fetchAllEmployeePages(employeeFilter==='slingers');
   }
-  const today=localDate();const overdueSlingers=employees.filter(e=>{const d=String(e.slinger_expiry_date||'').slice(0,10);return !!d&&d<today});$('#overdueSlingersCount').textContent=overdueSlingers.length;$('#slingerExpiryFilters').classList.toggle('hidden',employeeFilter!=='slingers'||!!q);if(employeeFilter==='slingers'&&!q&&slingerExpiryFilter==='overdue')employees=overdueSlingers;total=employees.length;$('#employeeCount').textContent='Найдено работников: '+total+(q?' · общий поиск: все работники и стропальщики':'');
-  const orderedEmployees=[...employees].sort((a,b)=>{const rank=e=>{const date=String(e.slinger_expiry_date||'').slice(0,10);if(!date)return 3;if(date<today)return 0;const days=Math.ceil((new Date(date+'T00:00:00')-new Date(today+'T00:00:00'))/86400000);return days<=30?1:2};return rank(a)-rank(b)||String(a.employee_name||'').localeCompare(String(b.employee_name||''),'ru')});
+  const today=localDate();
+  const overdueSlingers=employees.filter(e=>{const d=String(e.slinger_expiry_date||'').slice(0,10);return !!d&&d<today});
+  $('#overdueSlingersCount').textContent=overdueSlingers.length;
+  $('#slingerExpiryFilters').classList.toggle('hidden',employeeFilter!=='slingers'||!!q);
+  if(employeeFilter==='slingers'&&!q&&slingerExpiryFilter==='overdue')employees=overdueSlingers;
+  $('#employeeCount').textContent='Найдено работников: '+employees.length+(q?' · общий поиск: все работники и стропальщики':'');
+  const orderedEmployees=[...employees].sort((a,b)=>{
+   const rank=e=>{const date=String(e.slinger_expiry_date||'').slice(0,10);if(!date)return 3;if(date<today)return 0;const days=Math.ceil((new Date(date+'T00:00:00')-new Date(today+'T00:00:00'))/86400000);return days<=30?1:2};
+   return rank(a)-rank(b)||String(a.employee_name||'').localeCompare(String(b.employee_name||''),'ru');
+  });
   $('#employeeList').innerHTML=orderedEmployees.map((e,i)=>'<div class="item"><button type="button" class="secondary" style="text-align:left;background:#f4f7f5;color:#173b32" onclick="toggleEmployeeDetails('+i+')"><b>'+esc(e.employee_name)+'</b><span class="muted"> · '+esc(e.position||'Должность не указана')+' · нажмите, чтобы открыть сведения</span>'+slingerExpiryHtml(e)+'</button><div id="employeeDetails'+i+'" class="hidden" style="padding:10px 4px 2px"><div><b>ФИО:</b> '+esc(e.employee_name)+'</div><div><b>Должность:</b> '+esc(e.position||'—')+'</div><div><b>Организация:</b> '+esc(e.employer||'—')+'</div><div><b>Вводный инструктаж:</b> '+esc(e.instruction_date||'—')+'</div><div><b>Форма 086:</b> '+esc(e.form_086_value||'—')+'</div>'+((employeeFilter==='slingers'||String(e.position||'').toLocaleLowerCase('ru').includes('стропальщик'))?'<div><b>Удостоверение стропальщика:</b> '+esc(e.slinger_certificate||'—')+'</div>'+(e.slinger_expiry_date?'<div><b>Действительно до:</b> '+esc(formatExpiryDate(e.slinger_expiry_date))+'</div>':'<div class="muted">Дата окончания удостоверения не указана</div>'):'')+'</div></div>').join('')||'<p class="muted">'+(q?'По запросу ничего не найдено':(employeeFilter==='slingers'?'Стропальщики':'Работники')+' не найдены. Администратор может загрузить Excel-файл.')+'</p>';
- }catch(e){$('#employeeCount').textContent='Найдено работников: 0';$('#employeeList').innerHTML='<p class="error">'+esc(e.message)+'</p>'}
+ }catch(e){$('#employeeCount').textContent='Не удалось загрузить список работников';$('#employeeList').innerHTML='<p class="error">'+esc(e.message)+'</p>'}
 }
 async function uploadEmployees(){
  const file=$('#employeeExcel').files[0];if(!file)return alert('Выберите Excel-файл.');
