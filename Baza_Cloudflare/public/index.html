@@ -140,6 +140,7 @@ main{max-width:1500px;margin:22px auto;padding:0 18px}
 <button onclick="tab(&quot;tasks&quot;)" data-tab="tasks"><span>☑</span>Задания</button>
 <button onclick="tab('photos')" data-tab="photos"><span>▣</span>Фото</button>
 <button onclick="tab('docs')" data-tab="docs"><span>▤</span>Документы</button>
+<button onclick="tab('employees')" data-tab="employees"><span>♟</span>Работники</button>
 <button onclick="tab('more')" data-tab="more"><span>•••</span>Ещё</button>
 </nav>
 <p class="muted">Доступ к документам осуществляется через авторизацию. Не размещайте секреты и пароли в публичных файлах.</p>
@@ -152,7 +153,7 @@ function showLogin(){$('#login').classList.remove('hidden');$('#setup').classLis
 function showRecovery(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#recovery').classList.remove('hidden')}
 function showSetup(){$('#login').classList.add('hidden');$('#setup').classList.remove('hidden')}
 function showApp(){$('#login').classList.add('hidden');$('#setup').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=me.full_name+' · '+(me.role==='admin'?'Администратор':me.role==='responsible'?'Ответственный сотрудник':'Инженер ОТ и ТБ');$('#adminTab').classList.toggle('hidden',me.role!=='admin');tab('home');loadAll()}
-function tab(name){if(name==='more'){name='checklist'}['home','tasks','checklist','docs','admin','employees','photos'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('nav-active',b.dataset.tab===name));if(name==='employees'){const admin=me.role==='admin';$('#employeeImport').classList.toggle('hidden',!admin||employeeFilter==='slingers');$('#slingerImport').classList.toggle('hidden',!admin||employeeFilter!=='slingers');resetEmployeeResults()}if(name==='photos')loadAllPhotos();if(name==='home')renderHome()}
+function tab(name){if(name==='more'){name='checklist'}['home','tasks','checklist','docs','admin','employees','photos'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==name));document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('nav-active',b.dataset.tab===name));if(name==='employees'){const admin=me.role==='admin';$('#employeeImport').classList.toggle('hidden',!admin||employeeFilter==='slingers');$('#slingerImport').classList.toggle('hidden',!admin||employeeFilter!=='slingers');loadEmployees()}if(name==='photos')loadAllPhotos();if(name==='home')renderHome()}
 function msg(id,t,cls=''){const e=$(id);e.textContent=t;e.className=cls}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target)),btn=e.target.querySelector('button');btn.disabled=true;msg('#loginMsg','Проверяем данные…','muted');try{await api('/login',{method:'POST',body:JSON.stringify(b)});await init()}catch(x){showLogin();msg('#loginMsg',x.message||'Не удалось войти. Проверьте настройки сессии Worker.','error')}finally{btn.disabled=false}};
 $('#setupForm').onsubmit=async e=>{e.preventDefault();try{const d=await api('/setup',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target)))});msg('#setupMsg','Администратор создан. Теперь войдите.','success');showLogin()}catch(x){msg('#setupMsg',x.message,'error')}};
