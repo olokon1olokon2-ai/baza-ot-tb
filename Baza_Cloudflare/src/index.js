@@ -302,6 +302,24 @@ async function api(request, env) {
       throw error;
     }
   }
+  const userRoleMatch=path.match(/^\/api\/users\/(\\d+)\\/role$/);
+  if(userRoleMatch && method==="PATCH") {
+    if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
+    const id=Number(userRoleMatch[1]), body=await request.json();
+    if(!Number.isInteger(id)||id<1) return json({error:"Неверный пользователь"},400);
+    if(id===user.id) return json({error:"Нельзя менять роль своей учётной записи"},400);
+    if(!["engineer","responsible"].includes(body.role)) return json({error:"Можно выбрать только инженера или ответственного сотрудника"},400);
+    const target=await env.DB.prepare("SELECT id,role,is_responsible FROM users WHERE id=?").bind(id).first();
+    if(!target) return json({error:"Пользователь не найден"},404);
+    if(target.role==="admin") return json({error:"Роль администратора здесь не изменяется"},400);
+    const currentRole=target.is_responsible===1?"responsible":"engineer";
+    if(currentRole===body.role) return json({ok:true,unchanged:true});
+    await env.DB.prepare("UPDATE users SET is_responsible=? WHERE id=?").bind(body.role==="responsible"?1:0,id).run();
+    const roleLabel=body.role==="responsible"?"Ответственный сотрудник":"Инженер ОТ и ТБ";
+    await env.DB.prepare("INSERT INTO access_audit(actor_id,target_user_id,action) VALUES(?,?,?)")
+      .bind(user.id,id,"Роль изменена: "+roleLabel).run();
+    return json({ok:true,role:body.role});
+  }
   const userAccessMatch=path.match(/^\/api\/users\/(\d+)\/(reactivate|reset-password)$/);
   if(userAccessMatch && method==="POST") {
     if(!adminOnly(user)) return json({error:"Недостаточно прав"},403);
